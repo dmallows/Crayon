@@ -188,19 +188,5 @@ class Cursor(object):
     def __repr__(self):
         return '<Cursor(%g,%g)>' % self._cursor
 
-from bijections import lin_bijection, log_bijection
-from point import Cursor
-from context import TikzContext
 
-gc = TikzContext()
 
-paper = Coordinates((lin_bijection(0,800),))
-log = Coordinates((log_bijection(10,1000),))
-plot = Coordinates((lin_bijection(0,400),))
-
-c = Cursor(gc, (paper, paper), (plot, log))
-
-if __name__=='__main__':
-    c.to(800,600).rect().filldraw()
-    c.to.right(10).circle().draw()
-    print c._gc.buffer
