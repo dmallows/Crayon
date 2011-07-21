@@ -19,6 +19,36 @@ class Pen(object):
 
 isqrt2 = 1.0/sqrt(2)
 
+def _to_box(space, point):
+    print space
+    X, Y = space
+    x, y = point
+    return (X.to_box(x), Y.to_box(y))
+
+def _from_box(space, point):
+    print space
+    X, Y = space
+    x, y = point
+    return (X.from_box(x), Y.from_box(y))
+
+class Coordinates(object):
+    """Handles multiple coordinate systems"""
+    def __init__(self, transforms = ()):
+        self._transforms = tuple(transforms)
+    
+    def to_box(self, x):
+        """Convert coordinate in current space into box space"""
+        for f,_ in reversed(self._transforms):
+            x = f(x)
+        return x
+
+    def from_box(self, x):
+        """Convert coord into current space from box space"""
+        for _,g in self._transforms:
+            x = g(x)
+        return x
+
+
 class Cursor(object):
     """A cursor is a coordinate proxy.
     It is always made by another Cursor"""
@@ -27,40 +57,54 @@ class Cursor(object):
                     upLeft = (-isqrt2, isqrt2), upRight = (isqrt2, isqrt2),
                     downLeft = (-isqrt2, -isqrt2), downRight = (isqrt2, -isqrt2))
 
-    def __init__(self, paper, plot = None, default = None ):
-        if not default:
-            default = paper
+    _null = Coordinates()
+    _box = (_null, _null)
+
+    def __init__(self, paper, plot = None, current = None, cursor = (0,0) ):
+
+        if not current:
+            current = paper
+
         self._paper = paper
         self._plot = plot
-        self._default = default
-        self._origin = default.bake(0,0)
 
-    def set_default(self, default):
-        return Cursor(self._paper, self._plot, default=default)
+        # Cursor is in current space, and can be transformed
+        # to other spaces.
+        self._cursor = cursor
+        self._current = current
+
+    def _switch_space(self, default):
+        oldSpace = self._current
+        newSpace = default
+        cursor = self._cursor
+        
+        cursor = _from_box(newSpace , _to_box(oldSpace, cursor))
+        
+        return Cursor(self._paper, self._plot, default, cursor)
 
     @property
     def paper(self):
-        return self.set_default(self._paper)
+        return self._switch_space(self._paper)
 
     @property
     def plot(self):
         if self._plot:
-            return self.set_default(self._plot)
+            return self._switch_space(self._plot)
         else:
             raise RuntimeError('Plot has not been set')
+        
+    @property
+    def box(self):
+        return self._switch_space(self._box)
 
-    def move(self, x, y):
+    def move(self, dx, dy):
         """Return a shifted new cursor"""
-        paper, plot, default = self._paper, self._plot, self._default
+        cx, cy = self._cursor
+        cursor = (cx + dx, cy + dy)
+        return Cursor(self._paper, self._plot, self._current, cursor)
 
-        if paper is default:
-            paper = default = paper.translate(x,y)
-        elif plot is default:
-            plot = default = plot.translate(x,y)
-        else:
-            raise AttributeError('Default is not a current coordinate space')
-
-        return Cursor(paper, plot, default)
+    def __call__(self, x, y):
+        return Cursor(self._paper, self._plot, self._current, (x,y))
 
     def compass(self, dir):
         dx, dy = self._compass[dir]
@@ -73,30 +117,13 @@ class Cursor(object):
             raise AttributeError('Not found')
 
     def __repr__(self):
-        return '<Cursor %r>' % (self._origin, )
+        return '<Cursor(%g,%g)>' % self._cursor
 
-class Coordinates(object):
-    """Handles multiple coordinate systems"""
-    def __init__(self, transforms = ()):
-        self._transforms = tuple(transforms)
-    
-    def bake(self, x, y):
-        """Convert current space into absolute
-        space"""
-        for f in reversed(self._transforms):
-            x, y = f(x, y)
-        return (x, y)
 
-    def translate(self, dx, dy):
-        # Translate by dx, dy.
-        return self.transform(lambda x,y: (x+dx, y+dy))
+from bijections import lin_bijection, log_bijection
 
-    def transform(self, f):
-        return Coordinates(self._transforms + (f,))
+paper = Coordinates((lin_bijection(0,800),))
+log = Coordinates((log_bijection(10,1000),))
+plot = Coordinates((lin_bijection(0,400),))
 
-    def scale(self, sx, sy):
-        # Scale by sx, sy
-        return self.transform(lambda x, y: (x*sx, y*sy))
-
-a = Coordinates((lambda x, y: (10*x, 100*log(1+y)),))
-c = Cursor(Coordinates(), a)
+c = Cursor((paper, paper), (plot, log))
