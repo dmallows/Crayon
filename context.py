@@ -17,23 +17,41 @@ class Pen(object):
         """Set the current linewidth"""
         self.linewidth = linewidth
 
-class Context(object):
+class TikzContext(object):
     """Low-level stateful graphics context"""
+    def __init__(self, width=80, height=60):
+        self.size = width, height
+
+        self.buffer = []
+        self.buffer.append(r'\begin{tikzpicture}')
+
+        self._stack = None
+
     def user_to_device(self, point):
         """Converts from userspace to device space"""
-        pass
-    
-    def rectangle(self, a, b):
-        """Draw a rectangle from cursor a to cursor b"""
-        pass
-
+        return point
+   
     def push_path(self, markers, closed=False):
         """Draws a path of markers"""
-        pass
+        buffer = ' -- '.join('(%gmm, %gmm)' % self.user_to_device(m.pos) for m in markers)
+        if closed:
+            buffer = buffer + ' -- cycle'
+        self._stack = buffer
     
     def push_circle(self, centre, radius):
-        """Draws a path of markers"""
+        """Draws a circle"""
         x, y = centre.paper._cursor
-        print "Circle<%r %r %r>" % (x, y, radius)
+        self._stack = '(%gmm, %gmm) circle (%gmm)' % (x,y,radius)
 
-    
+    def draw(self):
+        self.buffer.append(r'\draw %s ;' % self._stack)
+
+    def fill(self):
+        self.buffer.append(r'\fill %s ;' % self._stack)
+
+    def filldraw(self):
+        self.buffer.append(r'\filldraw %s ;' % self._stack)
+
+    def paint(self):
+        self.buffer.append(r'\end{tikzpicture}')
+        print '\n'.join(self.buffer)

@@ -63,8 +63,10 @@ class Cursor(object):
         cursor = self._cursor
         
         cursor = _from_box(newSpace , _to_box(oldSpace, cursor))
-        
-        return Cursor(self._gc, self._paper, self._plot, default, cursor, self._path)
+         
+        return (self if (oldSpace is newSpace) else
+                Cursor(self._gc, self._paper, self._plot, default, cursor,
+                       self._path))
 
     @property
     def paper(self):
@@ -144,9 +146,21 @@ class Cursor(object):
         self._gc.push_path(path, closed=True)
         return self.clear()
 
+    @property
+    def pos(self):
+        if self._paper is self._current:
+            return self._cursor
+        else:
+            return self.paper.pos
 
-    def stroke(self):
-        self._gc.stroke()
+    def draw(self):
+        self._gc.draw()
+
+    def filldraw(self):
+        self._gc.filldraw()
+
+    def fill(self):
+        self._gc.fill()
 
     def circle(self):
         """Create a circle from the last two points of the path and push to
@@ -160,11 +174,15 @@ class Cursor(object):
         return Cursor(self._gc, self._paper, self._plot, self._current,
                       self._cursor, ())
 
-    def rectangle(self):
+    def rect(self):
         """Create a rectangle from the last two points of path"""
-        a = self._path[-1]
-        b = self
-        self._gc.push_path(path, closed=True)
+        a = self._path[-1].paper
+        x1, y1 = a._cursor
+        c = self.paper
+        x2, y2 = c._cursor
+        b = a(x1,y2)
+        d = c(x2,y1)
+        self._gc.push_path([a, b,c,d], True)
         return self._clear_path()
 
     def __repr__(self):
@@ -172,9 +190,9 @@ class Cursor(object):
 
 from bijections import lin_bijection, log_bijection
 from point import Cursor
-from context import Context
+from context import TikzContext
 
-gc = Context()
+gc = TikzContext()
 
 paper = Coordinates((lin_bijection(0,800),))
 log = Coordinates((log_bijection(10,1000),))
@@ -182,3 +200,7 @@ plot = Coordinates((lin_bijection(0,400),))
 
 c = Cursor(gc, (paper, paper), (plot, log))
 
+if __name__=='__main__':
+    c.to(800,600).rect().filldraw()
+    c.to.right(10).circle().draw()
+    print c._gc.buffer
