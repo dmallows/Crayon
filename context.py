@@ -4,32 +4,15 @@ from exceptions import RuntimeError
 from math import sqrt, log
 #import cairo
 
-from point import Cursor, Coordinates
-
-class Pen(object):
-    def __init__(self, color=(0,0,0), linewidth=1):
-        self.color = color
-        self.linewidth = linewidth
-
-    def set_rgb(self, r,g,b):
-        """Set the current colour"""
-        self.color = (r, g, b)
-
-    def set_linewidth(self, linewidth):
-        """Set the current linewidth"""
-        self.linewidth = linewidth
-
-from bijections import lin_bijection, log_bijection
-    
+from point import Cursor
+from spaces import LinSpace, Space2D
 
 class TikzContext(object):
     """Low-level stateful graphics context"""
     def __init__(self, width=80, height=60):
         self.size = width, height
 
-        xb = Coordinates((lin_bijection(0,width),))
-        yb = Coordinates((lin_bijection(0,height),))
-        self._paper = (xb, yb)
+        self._paper = Space2D(LinSpace(0,width),LinSpace(0, height))
         self._plot = None 
 
         self.buffer = []
