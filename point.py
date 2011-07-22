@@ -24,7 +24,7 @@ class Cursor(object):
     
     compass = Compass()
     
-    def __init__(self, gc, spaces, current, cursor = (0,0), path=()):
+    def __init__(self, gc, spaces, current, cursor = (0,0), path=(), zooms=()):
         # The graphics context enables drawing
         self._gc = gc
 
@@ -32,6 +32,7 @@ class Cursor(object):
         self._path = path
 
         self._spaces = spaces
+        self._zooms = zooms
 
         # Cursor is in current space, and can be transformed
         # to other spaces.
@@ -42,11 +43,21 @@ class Cursor(object):
         """Allow absolute coordinate by calling Cursor instances"""
         return self.set(cursor = (x,y))
 
-    def set(self, spaces = None, current = None, cursor = None, path = None):
-        spaces = self._spaces   if spaces  is None else spaces
+    def __getattr__(self, attr):
+        """Allows compass points to be used"""
+        try:
+            dx, dy = self.compass[attr]
+            return lambda d: self.move(d * dx, d * dy)
+        except AttributeError, e:
+            return self._switch_space(attr)
+
+    def set(self, spaces = None, current = None, cursor = None, path = None,
+            zooms = None):
+        spaces  = self._spaces  if spaces  is None else spaces
         current = self._current if current is None else current
-        cursor = self._cursor   if cursor  is None else cursor
-        path = self._path       if path    is None else path
+        cursor  = self._cursor  if cursor  is None else cursor
+        path    = self._path    if path    is None else path
+        zooms   = self._zooms   if zooms   is None else zooms
     
         return Cursor(self._gc, spaces, current, cursor, path)
 
@@ -103,6 +114,17 @@ class Cursor(object):
         else:
             return self.paper.distance_from(other)
         
+    def zoom(self):
+        a = self.stack[-1]
+        b = self
+
+        # Rescale the paper so it sits in [(0,0):(w,h)]
+        x1, y1 = a.paper.pos
+        x2, y2 = b.paper.pos
+        w = x2 - x1
+        h = y2 - y
+        self.paper.scale(w, h)
+
     @property
     def end(self):
         """Convert to a path and push to context"""
@@ -168,14 +190,6 @@ class Cursor(object):
         d = c(x2,y1)
         self._gc.push_path([a, b,c,d], True)
         return self._clear_path()
-
-    def __getattr__(self, attr):
-        """Allows compass points to be used"""
-        try:
-            dx, dy = self.compass[attr]
-            return lambda d: self.move(d * dx, d * dy)
-        except AttributeError, e:
-            return self._switch_space(attr)
 
     def __repr__(self):
         return '<Cursor(%g,%g)>' % self._cursor

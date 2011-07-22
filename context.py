@@ -20,7 +20,7 @@ class TikzCanvas(object):
         self._default = paper
 
         self._stack = None
-    
+
     def user_to_device(self, p):
         return p
 
@@ -55,10 +55,10 @@ class TikzCanvas(object):
     def set_plot(self, plot):
         self._scopes['plot'] = plot
 
-    def set_paper(self, local):
+    def set_local(self, local):
         self._scopes['local'] = local
 
-    def set_paper(self, glob):
+    def set_global(self, glob):
         self._scopes['global'] = glob
 
 gc = TikzCanvas(80,60)
