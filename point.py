@@ -16,25 +16,22 @@ class Compass(object):
     NW = upLeft    = leftUp    = _norm(-1, +1)
     SW = downLeft  = leftDown  = _norm(-1, -1)
 
-    __call__ = lambda s, a: getattr(s,a)
+    __getitem__ = lambda s, a: getattr(s,a)
 
 class Cursor(object):
-    """A cursor is a coordinate proxy.
-    It is always made by another Cursor or a graphics context"""
+    """A cursor is a coordinate proxy.  It is always made by another Cursor or a
+    graphics context"""
     
     compass = Compass()
-    _box = Space2D()
-
-    def __init__(self, gc, paper, plot = None, current = None, cursor = (0,0),
-                 path=() ):
-
+    
+    def __init__(self, gc, spaces, current, cursor = (0,0), path=()):
         # The graphics context enables drawing
         self._gc = gc
 
-        # Three coordinates are always available
-        self._paper = paper
-        self._plot = plot
+        # The current path that is being drawn
         self._path = path
+
+        self._spaces = spaces
 
         # Cursor is in current space, and can be transformed
         # to other spaces.
@@ -43,57 +40,52 @@ class Cursor(object):
 
     def __call__(self, x, y):
         """Allow absolute coordinate by calling Cursor instances"""
-        return Cursor(self._gc, self._paper, self._plot, self._current, (x,y),
-                      self._path)
+        return self.set(cursor = (x,y))
 
+    def set(self, spaces = None, current = None, cursor = None, path = None):
+        spaces = self._spaces   if spaces  is None else spaces
+        current = self._current if current is None else current
+        cursor = self._cursor   if cursor  is None else cursor
+        path = self._path       if path    is None else path
+    
+        return Cursor(self._gc, spaces, current, cursor, path)
 
-    def _switch_space(self, default):
+    def _lookup_space(self, name):
+        try:
+            return self._spaces[name]
+        except KeyError, e:
+            raise Exception('Space %r is undefined' % name)
+
+    def _switch_space(self, newName):
         """Switch coordinate space"""
+        newSpace = self._lookup_space(newName)
         oldSpace = self._current
-        newSpace = default
-        cursor = self._cursor
-        
-        cursor = newSpace.from_box(oldSpace.to_box(cursor))
-         
-        return (self if (oldSpace is newSpace) else
-                Cursor(self._gc, self._paper, self._plot, default, cursor,
-                       self._path))
 
-    @property
-    def paper(self):
-        """Switch to mm coordinate system"""
-        return self._switch_space(self._paper)
+        if newSpace is oldSpace:
+            return self
 
-    @property
-    def plot(self):
-        """Switch to space defined by axes of plot"""
-        if self._plot:
-            return self._switch_space(self._plot)
-        else:
-            raise RuntimeError('Plot has not been set')
-        
-    @property
-    def box(self):
-        """Switch to box space"""
-        return self._switch_space(self._box)
+        cursor = newSpace.from_box(oldSpace.to_box(self._cursor))
+
+        return self.set(current = newSpace, cursor = cursor)
+
+    def __dir__(self):
+        return
 
     @property
     def to(self):
         """Add current point to path"""
-        return Cursor(self._gc, self._paper, self._plot, self._current,
-                      self._cursor, self._path + (self,))
+        path = self._path + (self, ) 
+        return self.set(path = path)
 
     def move(self, dx, dy):
         """Return a shifted new cursor"""
         cx, cy = self._cursor
         cursor = (cx + dx, cy + dy)
-        return Cursor(self._gc, self._paper, self._plot, self._current, cursor,
-                      self._path)
-
+        return self.set(cursor = cursor)
 
     def distance_to(self, other):
         """Distance from cursor to another cursor in paper space"""
-        if self._current is self._paper:
+        if self is self.paper:
             return other.distance_from(self._cursor)
         else:
             return self.paper.distance_to(other)
@@ -103,7 +95,7 @@ class Cursor(object):
 
     def distance_from(self, pt):
         """Distance from current cursor to point in paper space"""
-        if self._current is self._paper:
+        if self is self.paper:
             x1, y1 = self._cursor
             x2, y2 = pt
             dx, dy = x1 - x2, y1 - y2
@@ -127,24 +119,27 @@ class Cursor(object):
 
     @property
     def pos(self):
-        if self._paper is self._current:
+        if self is self.paper:
             return self._cursor
         else:
-            return self.paper.pos()
+            return self.paper.pos
 
     def draw(self):
+        """Draw the currently stored path"""
         if self._path:
             self.end.draw()
         else:
             self._gc.draw()
 
     def filldraw(self):
+        """Fill and draw the currently stored path"""
         if self._path:
             self.end.filldraw()
         else:
             self._gc.filldraw()
 
     def fill(self):
+        """Fill the currently stored path"""
         if self._path:
             self.end.fill()
         else:
@@ -159,9 +154,10 @@ class Cursor(object):
         return self._clear_path()
 
     def _clear_path(self):
-        return Cursor(self._gc, self._paper, self._plot, self._current,
-                      self._cursor, ())
+        """Clear the currently stored path"""
+        return self.set(path = ())
 
+    @property
     def rect(self):
         """Create a rectangle from the last two points of path"""
         a = self._path[-1].paper
@@ -173,13 +169,14 @@ class Cursor(object):
         self._gc.push_path([a, b,c,d], True)
         return self._clear_path()
 
-    def __repr__(self):
-        return '<Cursor(%g,%g)>' % self._cursor
-
     def __getattr__(self, attr):
         """Allows compass points to be used"""
         try:
-            dx, dy = self.compass(attr)
+            dx, dy = self.compass[attr]
             return lambda d: self.move(d * dx, d * dy)
-        except KeyError, e:
-            raise AttributeError('Not found')
+        except AttributeError, e:
+            return self._switch_space(attr)
+
+    def __repr__(self):
+        return '<Cursor(%g,%g)>' % self._cursor
+

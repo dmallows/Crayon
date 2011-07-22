@@ -64,3 +64,9 @@ class Space2D(object):
 
     def __repr__(self):
         return "<Space2D (%r, %r)>" % (self.xspace, self.yspace)
+
+class BoxSpace(object):
+    def to_box(self, p):
+        return p
+    def from_box(self, p):
+        return p

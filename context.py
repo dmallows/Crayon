@@ -5,25 +5,25 @@ from math import sqrt, log
 #import cairo
 
 from point import Cursor
-from spaces import LinSpace, Space2D
+from spaces import LinSpace, Space2D, BoxSpace
+##from affine import Affine2D
 
-class TikzContext(object):
+class TikzCanvas(object):
     """Low-level stateful graphics context"""
-    def __init__(self, width=80, height=60):
-        self.size = width, height
-
-        self._paper = Space2D(LinSpace(0,width),LinSpace(0, height))
-        self._plot = None 
+    def __init__(self, width, height):
+        paper = Space2D(LinSpace(0,width),LinSpace(0, height))
+        self._scopes = dict(box = BoxSpace(), paper = paper) # Simplest space
 
         self.buffer = []
         self.buffer.append(r'\begin{tikzpicture}')
+        
+        self._default = paper
 
         self._stack = None
+    
+    def user_to_device(self, p):
+        return p
 
-    def user_to_device(self, point):
-        """Converts from userspace to device space"""
-        return point
-   
     def push_path(self, markers, closed=False):
         """Draws a path of markers"""
         buffer = ' -- '.join('(%gmm, %gmm)' % self.user_to_device(m.pos) for m in markers)
@@ -32,7 +32,7 @@ class TikzContext(object):
         self._stack = buffer
 
     def cursor(self):
-        return Cursor(gc, self._paper, self._plot)
+        return Cursor(gc, self._scopes, self._default)
     
     def push_circle(self, centre, radius):
         """Draws a circle"""
@@ -53,13 +53,19 @@ class TikzContext(object):
         print '\n'.join(self.buffer + [r'\end{tikzpicture}'])
 
     def set_plot(self, plot):
-        self._plot = plot
+        self._scopes['plot'] = plot
 
-gc = TikzContext(80,60)
+    def set_paper(self, local):
+        self._scopes['local'] = local
+
+    def set_paper(self, glob):
+        self._scopes['global'] = glob
+
+gc = TikzCanvas(80,60)
 c = gc.cursor()
 
 if __name__=='__main__':
-    c.box.to(1,1).rect().filldraw()
+    c.to.box(1,1).rect.draw()
     c.to.right(10).circle().draw()
     print c._gc.buffer
     gc.paint()
