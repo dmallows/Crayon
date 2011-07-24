@@ -5,14 +5,16 @@ from math import sqrt, log
 #import cairo
 
 from point import Cursor
-from spaces import LinSpace, Space2D, BoxSpace
+from spaces import LinSpace, Space2D, BoxSpace, LogSpace
 ##from affine import Affine2D
 
 class TikzCanvas(object):
     """Low-level stateful graphics context"""
     def __init__(self, width, height):
         paper = Space2D(LinSpace(0,width),LinSpace(0, height))
-        self._scopes = dict(box = BoxSpace(), paper = paper) # Simplest space
+        plot = Space2D(LinSpace(0, 100), LogSpace(10,1000))
+        self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper,
+                            plot = plot) # Simplest space
 
         self.buffer = []
         self.buffer.append(r'\begin{tikzpicture}')

@@ -13,6 +13,13 @@ class Space(object):
     def __repr__(self):
         return "<Space>" 
 
+    @property
+    def inverse(self):
+        l = Space()
+        l.to_box = self.from_box
+        l.from_box = self.to_box
+        return l
+
 class LinSpace(Space):
     """Logarithmic Bijection"""
     def __init__(self, a, b):
@@ -29,6 +36,7 @@ class LinSpace(Space):
 
     def __repr__(self):
         return "<LinSpace (%g, %g)>" % self.params
+
 
 class LogSpace(Space):
     """Logarithmic Bijection"""

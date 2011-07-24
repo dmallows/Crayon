@@ -1,7 +1,7 @@
 """Smart points for a graphics context"""
 
 from math import sqrt
-from spaces import Space2D
+from spaces import Space2D, LinSpace
 
 class Compass(object):
     _norm = lambda x, y: (x/sqrt(2), y/sqrt(2))
@@ -115,15 +115,36 @@ class Cursor(object):
             return self.paper.distance_from(other)
         
     def zoom(self):
-        a = self.stack[-1]
+        a = self._path[-1]
         b = self
 
-        # Rescale the paper so it sits in [(0,0):(w,h)]
-        x1, y1 = a.paper.pos
-        x2, y2 = b.paper.pos
-        w = x2 - x1
-        h = y2 - y
-        self.paper.scale(w, h)
+        # Rescale the box so it sits in [(0,0):(1,1)]
+        x1, y1 = a.box._cursor
+        x2, y2 = b.box._cursor
+
+        print x1, x2
+        print y1, y2
+
+        # Now, what would we have to do to undo such a transformation?
+        xspace = LinSpace(x1, x2).inverse
+        yspace = LinSpace(y1, y2).inverse
+        boxspace = Space2D(xspace, yspace)
+
+        spaces = self._spaces.copy()
+        spaces['box'] = boxspace
+
+        k = self.set(spaces=spaces)
+
+        x1, y1 = a.paper._cursor
+        x2, y2 = b.paper._cursor
+        
+        x1, y1 = a.paper(x1, y1).box._cursor
+        x2, y2 = b.paper(x2, y2).box._cursor
+
+        spaces['paper'] = Space2D(LinSpace(0, x2-x1), 
+                                  LinSpace(0, y2-y1))
+
+        return self.set(spaces=spaces)
 
     @property
     def end(self):
