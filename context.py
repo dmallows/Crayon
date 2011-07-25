@@ -15,7 +15,6 @@ class TikzCanvas(object):
         plot = Space2D(LinSpace(0, 100), LogSpace(10,1000))
         self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper,
                             plot = plot) # Simplest space
-
         self.buffer = []
         self.buffer.append(r'\begin{tikzpicture}')
         
@@ -66,8 +65,12 @@ class TikzCanvas(object):
 gc = TikzCanvas(80,60)
 c = gc.cursor()
 
+d = c.box(0.1,0.1).to(0.9,0.9).zoom()
+e = d.paper(10,10).to(50,50).zoom()
+
 if __name__=='__main__':
     c.to.box(1,1).rect.draw()
     c.to.right(10).circle().draw()
     print c._gc.buffer
     gc.paint()
+

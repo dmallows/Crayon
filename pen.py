@@ -1,5 +1,6 @@
 class Pen(object):
-    def __init__(self, color=(0,0,0), linewidth=1):
+    def __init__(self, color=(0,0,0), linewidth=0.5):
+        # Seriously, 1mm? Biro looks about 0.5mm. Changing.
         self.color = color
         self.linewidth = linewidth
 

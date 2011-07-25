@@ -1,5 +1,7 @@
 from math import log, exp
 
+
+
 class Space(object):
     """Bijection class. Stores function and its inverse"""
     def to_box(self, x):
@@ -70,11 +72,38 @@ class Space2D(object):
         x, y = p
         return (self.xspace.from_box(x), self.yspace.from_box(y))
 
+    @property
+    def inverse(self):
+        return Space2D(self.xspace.inverse, self.yspace.inverse)
+
+    def append(self, other):
+        return ComposedSpace(self, other)
+
     def __repr__(self):
         return "<Space2D (%r, %r)>" % (self.xspace, self.yspace)
 
-class BoxSpace(object):
-    def to_box(self, p):
-        return p
-    def from_box(self, p):
-        return p
+class LinSpace2D(Space2D):
+    def __init__(self, x1, y1, x2, y2):
+        Space2D.__init__(self, LinSpace(x1, x2), LinSpace(y1, y2))
+
+class BoxSpace(Space2D):
+    def __init__(self):
+        Space2D.__init__(self, Space(), Space())
+
+class ComposedSpace(Space2D):
+    def __init__(self, *kws):
+        self._spaces = tuple(kws)
+
+    def to_box(self, x):
+        # Technically this is a reduction
+        for space in reversed(self._spaces):
+            x = space.to_box(x)
+        return x
+
+    def from_box(self, x):
+        for space in self._spaces:
+            x = space.from_box(x)
+        return x
+
+    def append(self, other):
+        return ComposedSpace(*(self._spaces + (other,)))
