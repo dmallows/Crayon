@@ -12,9 +12,7 @@ class TikzCanvas(object):
     """Low-level stateful graphics context"""
     def __init__(self, width, height):
         paper = Space2D(LinSpace(0,width),LinSpace(0, height))
-        plot = Space2D(LinSpace(0, 100), LogSpace(10,1000))
-        self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper,
-                            plot = plot) # Simplest space
+        self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper)
         self.buffer = []
         self.buffer.append(r'\begin{tikzpicture}')
         
@@ -53,14 +51,9 @@ class TikzCanvas(object):
         #self.buffer.append(r'\end{tikzpicture}')
         print '\n'.join(self.buffer + [r'\end{tikzpicture}'])
 
-    def set_plot(self, plot):
-        self._scopes['plot'] = plot
+    def text(label, anchor=None, label=None):
+        return
 
-    def set_local(self, local):
-        self._scopes['local'] = local
-
-    def set_global(self, glob):
-        self._scopes['global'] = glob
 
 gc = TikzCanvas(80,60)
 c = gc.cursor()

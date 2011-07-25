@@ -144,6 +144,15 @@ class Cursor(object):
 
         return self.set(spaces=spaces)
 
+    def set_plot(self, plot):
+        spaces = self._spaces.copy()
+        spaces['plot'] = spaces['box'].append(plot)
+        return self.set(spaces=spaces)
+
+    def clear_plot(self):
+        spaces = self._spaces.copy()
+        del spaces['plot']
+
     @property
     def end(self):
         """Convert to a path and push to context"""
@@ -161,6 +170,14 @@ class Cursor(object):
     @property
     def pos(self):
         return self._cursor
+
+    def x(self, x):
+        _, y = self.pos
+        return self.set(cursor = (x, y))
+
+    def y(self, y):
+        x, _ = self.pos
+        return self.set(cursor = (x, y))
 
     def draw(self):
         """Draw the currently stored path"""
