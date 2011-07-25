@@ -142,7 +142,7 @@ class Cursor(object):
 
         spaces['paper'] = boxspace.append(LinSpace2D(0,0,dx,dy))
 
-        return self.set(spaces=spaces)
+        return self._clear_path().set(spaces=spaces)
 
     def set_plot(self, plot):
         spaces = self._spaces.copy()
@@ -182,9 +182,10 @@ class Cursor(object):
     def draw(self):
         """Draw the currently stored path"""
         if self._path:
-            self.end.draw()
+            return self.end.draw()
         else:
             self._gc.draw()
+            return self._clear_path()
 
     def filldraw(self):
         """Fill and draw the currently stored path"""
@@ -192,6 +193,10 @@ class Cursor(object):
             self.end.filldraw()
         else:
             self._gc.filldraw()
+
+    def text(self, label, anchor=None):
+        self._gc.text(self, label, anchor)
+        return self
 
     def fill(self):
         """Fill the currently stored path"""

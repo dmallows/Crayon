@@ -13,7 +13,10 @@ class TikzCanvas(object):
     def __init__(self, width, height):
         paper = Space2D(LinSpace(0,width),LinSpace(0, height))
         self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper)
-        self.buffer = []
+        self.buffer = [r'\documentclass{article}',
+                       r'\usepackage{tikz}',
+                       r'\begin{document}',
+                       r'\thispagestyle{empty}']
         self.buffer.append(r'\begin{tikzpicture}')
         
         self._default = paper
@@ -25,13 +28,15 @@ class TikzCanvas(object):
 
     def push_path(self, markers, closed=False):
         """Draws a path of markers"""
-        buffer = ' -- '.join('(%gmm, %gmm)' % self.user_to_device(m.pos) for m in markers)
+        buffer = ' -- '.join(
+            '(%gmm, %gmm)' % self.user_to_device(m.absolute.pos)
+            for m in markers)
         if closed:
             buffer = buffer + ' -- cycle'
         self._stack = buffer
 
     def cursor(self):
-        return Cursor(gc, self._scopes, self._default)
+        return Cursor(self, self._scopes, self._default)
     
     def push_circle(self, centre, radius):
         """Draws a circle"""
@@ -49,21 +54,14 @@ class TikzCanvas(object):
 
     def paint(self):
         #self.buffer.append(r'\end{tikzpicture}')
-        print '\n'.join(self.buffer + [r'\end{tikzpicture}'])
+        return '\n'.join(self.buffer + [r'\end{tikzpicture}',
+                                        r'\end{document}'])
 
-    def text(label, anchor=None, label=None):
+    def text(self, pos, label, anchor=None):
+        x, y = pos.absolute.pos
+        if anchor:
+            s = r'\node [anchor=%s] at (%gmm, %gmm) {%s};' % (anchor, x, y, label)
+        else:
+            s = r'\node at (%gmm, %gmm) {%s};' % (x, y, label)
+        self.buffer.append(s)
         return
-
-
-gc = TikzCanvas(80,60)
-c = gc.cursor()
-
-d = c.box(0.1,0.1).to(0.9,0.9).zoom()
-e = d.paper(10,10).to(50,50).zoom()
-
-if __name__=='__main__':
-    c.to.box(1,1).rect.draw()
-    c.to.right(10).circle().draw()
-    print c._gc.buffer
-    gc.paint()
-
