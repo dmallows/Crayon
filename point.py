@@ -141,7 +141,6 @@ class Cursor(object):
         dx, dy = x2 - x1, y2 - y1
 
         spaces['paper'] = boxspace.append(LinSpace2D(0,0,dx,dy))
-                          
 
         return self.set(spaces=spaces)
 

@@ -22,6 +22,7 @@ class Space(object):
         l.from_box = self.to_box
         return l
 
+
 class LinSpace(Space):
     """Logarithmic Bijection"""
     def __init__(self, a, b):
