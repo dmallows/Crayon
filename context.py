@@ -43,8 +43,12 @@ class TikzCanvas(object):
         x, y = centre.paper._cursor
         self._stack = '(%gmm, %gmm) circle (%gmm)' % (x,y,radius)
 
-    def draw(self):
-        self.buffer.append(r'\draw %s ;' % self._stack)
+    def draw(self, **kw):
+        if kw:
+            kw = ', '.join('%s=%s' % (i,j) for i, j in kw.iteritems())
+            self.buffer.append(r'\draw [%s] %s ;' % (kw, self._stack))
+        else:
+            self.buffer.append(r'\draw %s ;' % self._stack)
 
     def fill(self):
         self.buffer.append(r'\fill %s ;' % self._stack)

@@ -6,10 +6,10 @@ from spaces import Space2D, LinSpace2D, LinSpace
 class Compass(object):
     _norm = lambda x, y: (x/sqrt(2), y/sqrt(2))
     """Object to store directions. Preferred over a dict for clarity."""
-    N = up    = (0,1)
-    E = right = (1,0)
-    S = down  = (0,-1)
-    W = left  = (-1, 0)
+    N = up    = (0,1.)
+    E = right = (1.,0)
+    S = down  = (0,-1.)
+    W = left  = (-1., 0)
 
     NE = upRight   = rightUp   = _norm(+1, +1)
     SE = downRight = rightDown = _norm(+1, -1)
@@ -179,12 +179,12 @@ class Cursor(object):
         x, _ = self.pos
         return self.set(cursor = (x, y))
 
-    def draw(self):
+    def draw(self, *a, **kw):
         """Draw the currently stored path"""
         if self._path:
-            return self.end.draw()
+            return self.end.draw(*a, **kw)
         else:
-            self._gc.draw()
+            self._gc.draw(*a, **kw)
             return self._clear_path()
 
     def filldraw(self):

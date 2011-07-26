@@ -108,10 +108,10 @@ class Histo(Layer):
 
         self._space = Space2D(xspace, yspace)
 
-        from numpy import linspace, sin, exp, ones
-        x = linspace(0, 99.5, 200)
-        y = exp(6.8*sin(x))
-        data = zip(x, ones(200)*0.5, y)
+        from numpy import linspace, sin, exp, ones, pi
+        x = linspace(0, 99.8, 500)
+        y = exp(6.8*sin(2*pi/100.0*x))
+        data = zip(x, ones(500)*0.2, y)
         
         self.hticks = HTicks(LinTicker(xspace, 10, 2))
         self.vticks = VTicks(LogTicker(yspace))
@@ -141,8 +141,8 @@ class HTicks(Layer):
         self._ticker = ticker
 
     def draw(self, c):
-        top = c.box(0,1).plot.right
-        bottom = c.box(0,0).plot.right
+        top = c.box(0,1).plot.x
+        bottom = c.box(0,0).plot.x
 
         for x, label in self._ticker.major:
             top(x).paper.to.down(3).draw()
@@ -160,8 +160,9 @@ class VTicks(Layer):
         self._ticker = ticker
 
     def draw(self, c):
-        left = c.box(0,0).plot.up
-        right = c.box(1,0).plot.up
+        left = c.box(0,0).plot.y
+        right = c.box(1,0).plot.y
+
 
         for y, label in self._ticker.major:
             right(y).to.paper.left(3).draw()
@@ -187,7 +188,7 @@ class HistoData(Layer):
         for _, w, y in self._data[1:]:
             c = c.to.y(y).to.right(w)
 
-        c.to.y(y0).draw()
+        c.draw(color='red')
 
 h = Histo()
 h.fulldraw()
