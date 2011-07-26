@@ -1,42 +1,7 @@
 import math
 
 class Layer(object):
-    def __init__(self, above=[], below=[]):
-        self._above = above
-        self._below = below
-
-    def set(self, above=None, below=None):
-        above = above if above is not None else self._above
-        below = below if below is not None else self._below
-        return Layer(above, below)
-
-    def setup_draw(self, c):
-        return c
-
-    def add_above(self, layer):
-        return self._above.append(layer)
-
-    def add_below(self, layer):
-        return self._below.append(layer)
-
-    def draw(self, c):
-        return
-
-    def draw_all(self, c):
-        c = self.setup_draw(c)
-
-        for l in reversed(self._below):
-            #l.draw_all(c)
-            pass
-
-        self.draw(c)
-
-        for l in self._above:
-            #l.draw_all(c)
-            pass
-
-    def __repr__(self):
-        return '( %r %s %r )' % (self._below, self.__class__.__name__, self._above)
+    pass
 
 class Ticker(object):
     pass
@@ -99,7 +64,7 @@ from spaces import LinSpace, LogSpace, Space2D
 
 
 class Histo(Layer):
-    def __init__(self, width=160, height=120):
+    def __init__(self, width=80, height=60):
         Layer.__init__(self)
         self._canvas = TikzCanvas(width, height)
 
@@ -123,15 +88,17 @@ class Histo(Layer):
 
     def draw(self):
         c = self._canvas.cursor()
-
+        c.box(0,0).to(1,1).rect.filldraw(fill='gray', color='cyan')
         c = c.paper(10,10).to.box(1,1).paper.move(-10,-10).zoom()\
                                       .set_plot(self._space)
+
+        c.box(0,0).to(1,1).rect.fill(fill='darkgray')
         #print c.plot(0,0.001).absolute
         self.data.draw(c)
         self.hticks.draw(c)
         self.vticks.draw(c)
 
-        c.box(0,0).to(1,1).rect.draw()
+        c.box(0,0).to(1,1).rect.draw(color='yellow')
 
     fulldraw = draw
 
@@ -145,12 +112,12 @@ class HTicks(Layer):
         bottom = c.box(0,0).plot.x
 
         for x, label in self._ticker.major:
-            top(x).paper.to.down(3).draw()
-            bottom(x).paper.to.up(3).draw().down(4).text(label, anchor='north')
+            top(x).to.box.down(0.02).draw()
+            bottom(x).to.box.up(0.02).draw().down(0.02).text(label, anchor='north')
 
         for x in self._ticker.minor:
-            top(x).paper.to.up(1.5).draw()
-            bottom(x).paper.to.down(1.5).draw()
+            top(x).to.box.up(0.01).draw()
+            bottom(x).to.box.down(0.01).draw()
 
         return
 
@@ -165,12 +132,12 @@ class VTicks(Layer):
 
 
         for y, label in self._ticker.major:
-            right(y).to.paper.left(3).draw()
-            left(y).paper.to.right(3).draw().left(4).text(label, anchor='east')
+            right(y).to.box.left(0.02).draw()
+            left(y).to.box.right(0.02).draw().left(0.02).text(label, anchor='east')
 
         for y in self._ticker.minor:
-            right(y).paper.to.left(1.5).draw()
-            left(y).paper.to.right(1.5).draw()
+            right(y).to.box.left(0.01).draw()
+            left(y).to.box.right(0.01).draw()
 
         return
 
@@ -185,10 +152,12 @@ class HistoData(Layer):
 
         c = c.plot(x,y0)
 
-        for _, w, y in self._data[1:]:
-            c = c.to.y(y).to.right(w)
+        for x, w, y in self._data:
+            c = c.to(x,y).to(x+w, y)
 
-        c.draw(color='red')
+        c = c.to.y(y0)
+
+        c.end.draw(color='red')
 
 h = Histo()
 h.fulldraw()

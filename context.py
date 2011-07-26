@@ -14,10 +14,12 @@ class TikzCanvas(object):
         paper = Space2D(LinSpace(0,width),LinSpace(0, height))
         self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper)
         self.buffer = [r'\documentclass{article}',
+                       r'\usepackage[rgb]{xcolor}',
                        r'\usepackage{tikz}',
                        r'\begin{document}',
-                       r'\thispagestyle{empty}']
-        self.buffer.append(r'\begin{tikzpicture}')
+                       r'\thispagestyle{empty}',
+                       r'\begin{tikzpicture}',
+                       r'\definecolor{darkgrey}{rgb}{0.3, 0.3, 0.3}']
         
         self._default = paper
 
@@ -42,19 +44,21 @@ class TikzCanvas(object):
         """Draws a circle"""
         x, y = centre.paper._cursor
         self._stack = '(%gmm, %gmm) circle (%gmm)' % (x,y,radius)
-
-    def draw(self, **kw):
+    def _tikz_path_command(self, cmd, **kw):
         if kw:
             kw = ', '.join('%s=%s' % (i,j) for i, j in kw.iteritems())
-            self.buffer.append(r'\draw [%s] %s ;' % (kw, self._stack))
+            self.buffer.append(r'\%s [%s] %s ;' % (cmd, kw, self._stack))
         else:
-            self.buffer.append(r'\draw %s ;' % self._stack)
+            self.buffer.append(r'\%s %s ;' % (cmd, self._stack))
 
-    def fill(self):
-        self.buffer.append(r'\fill %s ;' % self._stack)
+    def draw(self, **kw):
+        self._tikz_path_command('draw', **kw)
 
-    def filldraw(self):
-        self.buffer.append(r'\filldraw %s ;' % self._stack)
+    def fill(self, **kw):
+        self._tikz_path_command('fill', **kw)
+
+    def filldraw(self, **kw):
+        self._tikz_path_command('filldraw', **kw)
 
     def paint(self):
         #self.buffer.append(r'\end{tikzpicture}')

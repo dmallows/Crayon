@@ -187,23 +187,25 @@ class Cursor(object):
             self._gc.draw(*a, **kw)
             return self._clear_path()
 
-    def filldraw(self):
+    def filldraw(self, *a, **kw):
         """Fill and draw the currently stored path"""
         if self._path:
-            self.end.filldraw()
+            return self.end.filldraw(*a, **kw)
         else:
-            self._gc.filldraw()
+            self._gc.filldraw(*a, **kw)
+            return self._clear_path()
 
     def text(self, label, anchor=None):
         self._gc.text(self, label, anchor)
         return self
 
-    def fill(self):
+    def fill(self, *a, **kw):
         """Fill the currently stored path"""
         if self._path:
-            self.end.fill()
+            return self.end.fill(*a, **kw)
         else:
-            self._gc.fill()
+            self._gc.fill(*a, **kw)
+            return self._clear_path()
 
     def circle(self):
         """Create a circle from the last two points of the path and push to
