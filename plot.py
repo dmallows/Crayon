@@ -74,8 +74,8 @@ class Histo(Layer):
         self._space = Space2D(xspace, yspace)
 
         from math import sin, exp, pi
-        xs = (x * 0.2 for x in xrange(0, 500))
-        data = [(x, 0.2, exp(6.8*sin(2*pi/100.0*x))) for x in xs]
+        xs = (x * 1.0 for x in xrange(0, 100))
+        data = [(x, 1.0, exp(6.8*sin(2*pi/100.0*x))) for x in xs]
         
         self.hticks = HTicks(LinTicker(xspace, 10, 2))
         self.vticks = VTicks(LogTicker(yspace))
@@ -87,17 +87,17 @@ class Histo(Layer):
 
     def draw(self):
         c = self._canvas.cursor()
-        c.box(0,0).to(1,1).rect.filldraw(fill='gray', color='cyan')
+        c.box(0,0).to(1,1).rect.draw()
         c = c.paper(10,10).to.box(1,1).paper.move(-10,-10).zoom()\
                                       .set_plot(self._space)
 
-        c.box(0,0).to(1,1).rect.fill(fill='darkgray')
+        #c.box(0,0).to(1,1).rect.fill()
         #print c.plot(0,0.001).absolute
         self.data.draw(c)
         self.hticks.draw(c)
         self.vticks.draw(c)
 
-        c.box(0,0).to(1,1).rect.draw(color='yellow')
+        c.box(0,0).to(1,1).rect.draw()
 
     fulldraw = draw
 
