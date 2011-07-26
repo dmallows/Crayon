@@ -73,10 +73,9 @@ class Histo(Layer):
 
         self._space = Space2D(xspace, yspace)
 
-        from numpy import linspace, sin, exp, ones, pi
-        x = linspace(0, 99.8, 500)
-        y = exp(6.8*sin(2*pi/100.0*x))
-        data = zip(x, ones(500)*0.2, y)
+        from math import sin, exp, pi
+        xs = (x * 0.2 for x in xrange(0, 500))
+        data = [(x, 0.2, exp(6.8*sin(2*pi/100.0*x))) for x in xs]
         
         self.hticks = HTicks(LinTicker(xspace, 10, 2))
         self.vticks = VTicks(LogTicker(yspace))
