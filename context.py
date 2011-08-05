@@ -44,6 +44,7 @@ class TikzCanvas(object):
         """Draws a circle"""
         x, y = centre.paper._cursor
         self._stack = '(%gmm, %gmm) circle (%gmm)' % (x,y,radius)
+
     def _tikz_path_command(self, cmd, **kw):
         if kw:
             kw = ', '.join('%s=%s' % (i,j) for i, j in kw.iteritems())

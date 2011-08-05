@@ -1,14 +1,27 @@
 import math
 
 class Layer(object):
-    pass
+    """A layer is a node in a tree, with higher and lower branches."""
+    def __init__(self, lower=None, higher=None):
+        self.higher = () if higher is None else higher
+        self.lower = () if higher is None else higher
+    def set(self, higher = None, lower = None):
+        higher = self.higher if higher is None else higher
+        lower = self.lower if lower is None else lower
+        return Layer(lower, higher)
 
-class Ticker(object):
-    pass
+    def append_below(self, o):
+        self.lower = self.lower
+
+    def append_above(self, o):
+        self.lower = self.lower
 
 ceil = lambda x : int(math.ceil(x))
+floor = lambda x: int(math.floor(x))
+log = math.log
 
-class LinTicker(Ticker):
+class LinTicker(object):
+    """A ticker for linear axes"""
     def __init__(self, space, major, minor):
         major = float(major)
         minor = float(minor)
@@ -26,15 +39,15 @@ class LinTicker(Ticker):
         """Major ticks"""
         a, b = self._range
         ticks = (i*dx for i in xrange(ceil(a / dx), int(1 + b/dx)) )
-        return map(lambda i: (i, self._to_str(i)), ticks)
+        return tuple((i, self._to_str(i)) for i in ticks)
 
-    def _calc_minor(self, minor, major):
-        return []
+    def _calc_minor(self, dx, dxm):
+        """Minor ticks"""
+        a, b = self._range
+        ticks = (i*dxm for i in xrange(ceil(a / dxm), int(1 + b/dxm)) )
+        return tuple(i for i in ticks if i not in self.major)
 
-floor = lambda x: int(math.floor(x))
-log = math.log
-
-class LogTicker(Ticker):
+class LogTicker(object):
     def __init__(self, space):
         self._space = space
         self._range = (space.from_box(0), space.from_box(1))
@@ -62,9 +75,8 @@ class LogTicker(Ticker):
 from context import TikzCanvas
 from spaces import LinSpace, LogSpace, Space2D
 
-
 class Histo(Layer):
-    def __init__(self, width=80, height=60):
+    def __init__(self, width=160, height=120):
         Layer.__init__(self)
         self._canvas = TikzCanvas(width, height)
 
@@ -77,7 +89,7 @@ class Histo(Layer):
         xs = (x * 1.0 for x in xrange(0, 100))
         data = [(x, 1.0, exp(6.8*sin(2*pi/100.0*x))) for x in xs]
         
-        self.hticks = HTicks(LinTicker(xspace, 10, 2))
+        self.hticks = HTicks(LinTicker(xspace, 20, 1))
         self.vticks = VTicks(LogTicker(yspace))
         self.data = HistoData(data)
 
@@ -115,8 +127,8 @@ class HTicks(Layer):
             bottom(x).to.box.up(0.02).draw().down(0.02).text(label, anchor='north')
 
         for x in self._ticker.minor:
-            top(x).to.box.up(0.01).draw()
-            bottom(x).to.box.down(0.01).draw()
+            top(x).to.box.down(0.01).draw()
+            bottom(x).to.box.up(0.01).draw()
 
         return
 
