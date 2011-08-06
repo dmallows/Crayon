@@ -1,103 +1,21 @@
-from multiprocessing import Pool
+from Queue import Queue
+from threading import Thread
+from hashlib import md5
 
 import tempfile 
 import shutil
 
 import subprocess
 import os
+path = os.path
 
-class logErrors(object):
-    def __init__(self, f):
-        self.f = f 
-        
-    def __call__(self, *args, **kwargs):
-        try:
-            return self.f(*args, **kwargs)
-        except Exception, e:
-            print e
-            return e
-
-def _latex_render_worker_init(preamble, pretext, posttext, workdir, cachedir):
-    """A function called on each worker process in the pool."""
-    from os import path
-
-    """Set up initial state for each thread worker"""
-    # Global state is usually a very bad thing. However, here it happens to save
-    # writing our own pool. Therefore it stays!  TODO: Remove this global state,
-    # if a sensible way ever arises!
-    global PREAMBLE, PRETEXT, POSTTEXT,WORKDIR, CACHEDIR
-
-    PRETEXT  = pretext
-    POSTTEXT = posttext
-    WORKDIR  = workdir
-    CACHEDIR = cachedir
-    PREAMBLE = preamble
-
-_latex_render_worker_init = logErrors(_latex_render_worker_init)
-
-def _latex_render_helper(text):
-    try:
-        import os
-        from hashlib import md5
-        path = os.path
-
-        # Generate the cachename
-        fulltex = '\n'.join((PREAMBLE, PRETEXT, text, POSTTEXT))
-
-        cachename = md5(fulltex).hexdigest()
-
-        cachefile = path.join(CACHEDIR, '%s.svg' % cachename)
-
-        # Check to see if svg exists in cache. If so, wonderful.
-        if os.path.isfile(cachefile):
-            return cachefile
-
-        # Since the result is not cached, we must run latex.
-        texfile = path.join(WORKDIR, '%s.tex' % cachename)
-
-        # Generate the latex source file
-        with open(texfile, 'w') as f:
-            f.write('\n'.join((PRETEXT, text, POSTTEXT)))
-
-        # Run latex, error if we get anything other than return code zero.
-        print 'RUN latex'
-        try:
-            subprocess.check_call(
-                ('latex','-interaction=batchmode','-fmt','preamble.fmt',texfile),
-                cwd=WORKDIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except Exception, e:
-                print e
-
-        # Now, we try convert from dvi to svg.
-        dvifile = path.join(WORKDIR, '%s.dvi' % cachename)
-
-        try:
-            subprocess.check_call(
-                ('dvisvgm', '-S', '-n', dvifile),
-                cwd=WORKDIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except Exception, e:
-                print e
-
-        # Then move into the cachedir, guaranteed atomically on POSIX.
-        # Therefore, even if two process run, they cannot mess each other up!
-        svgfile = path.join(WORKDIR, '%s.svg' % cachename)
-
-        os.rename(svgfile, cachefile)
-        return cachefile
-
-    except Exception, e:
-        print e
-        return e
-
-class LatexRenderer(object):
+class LatexProxy(object):
     def __init__(self):
         self._tempdir = tempfile.mkdtemp(prefix='plotty.')
         self._cachedir = os.path.expanduser('~/.plotty/svgcache')
 
         if not os.path.exists(self._cachedir):
               os.makedirs(self._cachedir)
-
-        self._results = {}
 
         # Open preamble, pretext and posttext
         with open('data/preamble.tex', 'r') as f:
@@ -112,54 +30,123 @@ class LatexRenderer(object):
         with open(os.path.join(self._tempdir, 'preamble.tex'),'w') as f:
             f.write(preamble)
 
+        self.make_preamble() 
+        self._md5 = md5('\n'.join((preamble, before, after)))
+
+        self.pre = before
+        self.post = after
+        self.check_preamble()
+
+    def make_preamble(self):
         pipe = subprocess.PIPE
-        mkpre = subprocess.Popen((
+        self._mkpre = subprocess.Popen((
             'latex','-interaction=batchmode', '-ini',
             '&latex preamble.tex\dump'),
             stdout=pipe,stderr=pipe, cwd=self._tempdir)
 
-        self._pool = Pool(
-            initializer=_latex_render_worker_init,
-            initargs=(preamble, before, after, self._tempdir, self._cachedir))
+    def check_preamble(self):
+        self._mkpre.communicate()
 
-        mkpre.communicate()
-
-        if mkpre.returncode != 0:
+        if self._mkpre.returncode != 0:
             raise RuntimeError('Latex was unable to compile the preamble.')
 
-    def close(self):
-        self._pool.terminate()
+    def make_tex_file(self, text, texfile):
+        with open(texfile, 'w') as f:
+            f.write('\n'.join((self.pre, text, self.post)))
 
-        try:
-            shutil.rmtree(self._tempdir)
-        except OSError:
-            pass
+    def run_latex(self, texfile):
+        subprocess.check_call(
+            ('latex','-interaction=batchmode','-fmt','preamble.fmt',texfile),
+            cwd=self._tempdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def run_dvisvgm(self, dvifile):
+        subprocess.check_call(
+            ('dvisvgm', '-S', '-n', dvifile),
+            cwd=self._tempdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def get_hash(self, text):
+        hash = self._md5.copy()
+        hash.update(text)
+        return hash.hexdigest()
 
     def render(self, text):
-        # First check the svg cache. 
+        """Render given latex, returning the filename of the svg"""
+        # Generate the cached base name
+        cachename = self.get_hash(text)
 
+        # Generate filename of cached svg file
+        cachefile = path.join(self._cachedir, '%s.svg' % cachename)
+
+        # Check to see if svg exists in cache. If so, wonderful.
+        if not os.path.isfile(cachefile):
+            # Since the result is not cached, we must run latex.
+            texfile = path.join(self._tempdir, '%s.tex' % cachename)
+
+            # Generate the latex source file
+            self.make_tex_file(text, texfile)
+
+            # Run latex to make a dvi file
+            self.run_latex(texfile)
+
+            # Now, we try convert from dvi to svg.
+            dvifile = path.join(self._tempdir, '%s.dvi' % cachename)
+            self.run_dvisvgm(dvifile)
+
+            # Then move into the cachedir, guaranteed atomically on POSIX.
+            # Therefore, even if two process run, they cannot mess each other
+            # up!
+            svgfile = path.join(self._tempdir, '%s.svg' % cachename)
+
+            os.rename(svgfile, cachefile)
+            
+        return cachefile
+
+class Result(object):
+    def __init__(self):
+        self.value = None
+
+
+class Worker(Thread):
+    """Thread for rendering latex"""
+    def __init__(self, tasks, latexproxy):
+        Thread.__init__(self)
+        self.latexproxy = latexproxy
+        self.tasks = tasks
+        self.daemon = True
+        self.start()
+    
+    def run(self):
+        while True:
+            try:
+                (result, text) = self.tasks.get()
+                result.value = self.latexproxy.render(text)
+                self.tasks.task_done()
+            except Exception, e:
+                print e
+
+class LatexPool(object):
+    def __init__(self, num_threads=4, latexproxy = None):
+        self._latexproxy = LatexProxy() if latexproxy is None else latexproxy
+        self._tasks = Queue()
+        self._results = {}
+        for _ in xrange(num_threads):
+            Worker(self._tasks, self._latexproxy)
+
+    def render(self, text):
         try:
-            result = self._results[text]
+            return self._results[text]
         except KeyError:
-            result = self._pool.apply_async(_latex_render_helper, (text,))
+            # Create a 'thunk' - a result that will be later.
+            result = Result()
+            self._tasks.put((result, text))
             self._results[text] = result
-
-        return result
-
-    def batch_render(self, texts):
-        return self._pool.map_async(_latex_render_helper, texts)
-
-    def __del__(self):
-        self.close()
+            return result 
 
 if __name__=='__main__':
-    a = LatexRenderer()
-
-    try:
-        results = a.batch_render('%03d' % i for i in xrange(100)).get(20)
-        #for r in results:
-            #print r
-    except KeyboardInterrupt, e:
-        print "Keyboard interrupt... closing threads"
-    finally:
-        a.close()
+    a = LatexPool()
+    results = [a.render('%03d' % i) for i in xrange(100)]
+        
+    print "Waiting..."
+    a._tasks.join()
+    for r in results:
+        print r.value
