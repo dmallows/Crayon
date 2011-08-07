@@ -1,6 +1,7 @@
 from Queue import Queue
 from threading import Thread
 from hashlib import md5
+import multiprocessing
 
 import tempfile 
 import shutil
@@ -120,12 +121,18 @@ class Worker(Thread):
             try:
                 (result, text) = self.tasks.get()
                 result.value = self.latexproxy.render(text)
-                self.tasks.task_done()
             except Exception, e:
                 print e
+                result.value = e
+            finally:
+                self.tasks.task_done()
+
 
 class LatexPool(object):
-    def __init__(self, num_threads=4, latexproxy = None):
+    def __init__(self, num_threads=None, latexproxy = None):
+        num_threads = multiprocessing.cpu_count() if num_threads is None\
+                                                  else num_threads
+
         self._latexproxy = LatexProxy() if latexproxy is None else latexproxy
         self._tasks = Queue()
         self._results = {}
@@ -144,9 +151,19 @@ class LatexPool(object):
 
 if __name__=='__main__':
     a = LatexPool()
-    results = [a.render('%03d' % i) for i in xrange(100)]
+    """result = a.render('A')
+    a._tasks.join()
+    print result.value"""
+
+    results = [a.render(r'%05d $\times 10^{37}$' % i) for i in xrange(100)]
         
     print "Waiting..."
-    a._tasks.join()
+    import time
+
+    while a._tasks.unfinished_tasks:
+        time.sleep(0.05)
+
+    a._tasks.join()             
+
     for r in results:
         print r.value

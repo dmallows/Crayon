@@ -1,6 +1,9 @@
 from math import pi
 from spaces import Space2D, LinSpace, BoxSpace
 
+# We really need to know exactly how wide each string will be, so that when it
+# is placed within a box, the box can be resized accordingly.
+
 class CairoContext(object):
     """Low-level stateful graphics context"""
     def __init__(self,context, width, height):
@@ -35,5 +38,4 @@ class CairoContext(object):
         self.context.fillstroke()
 
     def text(self, pos, label, anchor=None):
-        return
-
+        self.textcache.add
