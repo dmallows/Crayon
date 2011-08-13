@@ -90,7 +90,7 @@ class Histo(Layer):
         data = [(x, 1.0, exp(6.8*sin(2*pi/100.0*x))) for x in xs]
         
         self.hticks = HTicks(LinTicker(xspace, 20, 1))
-        self.vticks = VTicks(LogTicker(yspace))
+        self.vticks = VTicks(LinTicker(yspace))
         self.data = HistoData(data)
 
     def setup_draw(self, c):
