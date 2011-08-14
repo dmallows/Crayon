@@ -1,169 +1,140 @@
-from Queue import Queue
-from threading import Thread
-from hashlib import md5
-import multiprocessing
-
-import tempfile 
-import shutil
+#! /usr/bin/python
+import hashlib
+import Queue
 
 import subprocess
 import os
-path = os.path
+import re
+import math
+import shelve
 
-class LatexProxy(object):
+data = shelve.open('foo.db', protocol=1)
+
+class PosParser(object):
+    """Parser for dvipos bounding box output"""
     def __init__(self):
-        self._tempdir = tempfile.mkdtemp(prefix='plotty.')
-        self._cachedir = os.path.expanduser('~/.plotty/svgcache')
+        self.bbline = re.compile('^pagebb & (\d+) & (.*)')
+        self.numbers = re.compile(r'[0-9.A-F-]+')
 
-        if not os.path.exists(self._cachedir):
-              os.makedirs(self._cachedir)
+    def parse(self, filename):
+        with open(filename, 'r') as file:
+            matches = (self.bbline.match(line) for line in file)
+            return [self._parse_line(match.group(2))
+                    for match in matches if match]
 
-        # Open preamble, pretext and posttext
-        with open('data/preamble.tex', 'r') as f:
-            preamble = f.read()
+    def _parse_hex(self, hex):
+        a, b = hex.split('.')
+        a, b = int(a), int(b, 16)
+        return a + math.copysign(b,a)/65536.0
 
-        with open('data/before.tex', 'r') as f:
-            before = f.read()
-
-        with open('data/after.tex', 'r') as f:
-            after = f.read()
-
-        with open(os.path.join(self._tempdir, 'preamble.tex'),'w') as f:
-            f.write(preamble)
-
-        self.make_preamble() 
-        self._md5 = md5('\n'.join((preamble, before, after)))
-
-        self.pre = before
-        self.post = after
-        self.check_preamble()
-
-    def make_preamble(self):
-        pipe = subprocess.PIPE
-        self._mkpre = subprocess.Popen((
-            'latex','-interaction=batchmode', '-ini',
-            '&latex preamble.tex\dump'),
-            stdout=pipe,stderr=pipe, cwd=self._tempdir)
-
-    def check_preamble(self):
-        self._mkpre.communicate()
-
-        if self._mkpre.returncode != 0:
-            raise RuntimeError('Latex was unable to compile the preamble.')
-
-    def make_tex_file(self, text, texfile):
-        with open(texfile, 'w') as f:
-            f.write('\n'.join((self.pre, text, self.post)))
-
-    def run_latex(self, texfile):
-        subprocess.check_call(
-            ('latex','-interaction=batchmode','-fmt','preamble.fmt',texfile),
-            cwd=self._tempdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    def run_dvisvgm(self, dvifile):
-        subprocess.check_call(
-            ('dvisvgm', '-S', '-n', dvifile),
-            cwd=self._tempdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    def get_hash(self, text):
-        hash = self._md5.copy()
-        hash.update(text)
-        return hash.hexdigest()
-
-    def render(self, text):
-        """Render given latex, returning the filename of the svg"""
-        # Generate the cached base name
-        cachename = self.get_hash(text)
-
-        # Generate filename of cached svg file
-        cachefile = path.join(self._cachedir, '%s.svg' % cachename)
-
-        # Check to see if svg exists in cache. If so, wonderful.
-        if not os.path.isfile(cachefile):
-            # Since the result is not cached, we must run latex.
-            texfile = path.join(self._tempdir, '%s.tex' % cachename)
-
-            # Generate the latex source file
-            self.make_tex_file(text, texfile)
-
-            # Run latex to make a dvi file
-            self.run_latex(texfile)
-
-            # Now, we try convert from dvi to svg.
-            dvifile = path.join(self._tempdir, '%s.dvi' % cachename)
-            self.run_dvisvgm(dvifile)
-
-            # Then move into the cachedir, guaranteed atomically on POSIX.
-            # Therefore, even if two process run, they cannot mess each other
-            # up!
-            svgfile = path.join(self._tempdir, '%s.svg' % cachename)
-
-            os.rename(svgfile, cachefile)
-            
-        return cachefile
-
-class Result(object):
-    def __init__(self):
-        self.value = None
+    def _parse_line(self, line):
+        return tuple (self._parse_hex(i.group(0))
+                      for i in self.numbers.finditer(line))
 
 
-class Worker(Thread):
-    """Thread for rendering latex"""
-    def __init__(self, tasks, latexproxy):
-        Thread.__init__(self)
-        self.latexproxy = latexproxy
-        self.tasks = tasks
-        self.daemon = True
-        self.start()
-    
-    def run(self):
-        while True:
-            try:
-                (result, text) = self.tasks.get()
-                result.value = self.latexproxy.render(text)
-            except Exception, e:
-                print e
-                result.value = e
-            finally:
-                self.tasks.task_done()
+## Obtain list of strings to pass through tex
 
+texes = ['Hello World %d' % i for i in xrange(100)]
 
-class LatexPool(object):
-    def __init__(self, num_threads=None, latexproxy = None):
-        num_threads = multiprocessing.cpu_count() if num_threads is None\
-                                                  else num_threads
+## Generate hash of templates
 
-        self._latexproxy = LatexProxy() if latexproxy is None else latexproxy
-        self._tasks = Queue()
-        self._results = {}
-        for _ in xrange(num_threads):
-            Worker(self._tasks, self._latexproxy)
+def read(file):
+    with open(file) as f:
+        return f.read().strip()
 
-    def render(self, text):
-        try:
-            return self._results[text]
-        except KeyError:
-            # Create a 'thunk' - a result that will be later.
-            result = Result()
-            self._tasks.put((result, text))
-            self._results[text] = result
-            return result 
+preamble, pre_doc, pre_tex, post_tex, post_doc = (
+    read(os.path.join('templates',i)+'.tex') for i in 
+    ('preamble', 'pre_doc', 'pre_tex', 'post_tex', 'post_doc'))
 
-if __name__=='__main__':
-    a = LatexPool()
-    """result = a.render('A')
-    a._tasks.join()
-    print result.value"""
+md5sum = hashlib.md5('\n'.join((preamble, pre_doc, pre_tex, post_tex, post_doc)))
 
-    results = [a.render(r'%05d $\times 10^{37}$' % i) for i in xrange(100)]
-        
-    print "Waiting..."
-    import time
+## Hash each individual piece of TeX
 
-    while a._tasks.unfinished_tasks:
-        time.sleep(0.05)
+def calc_md5(text):
+    md5 = md5sum.copy()
+    md5.update(text)
+    return md5.hexdigest()
 
-    a._tasks.join()             
+md5sums = map(calc_md5, texes)
 
-    for r in results:
-        print r.value
+## See if each hash is in the database
+
+pass
+
+## If the hash is in the database, return the corresponding deferred result
+## object.
+
+pass
+
+## Otherwise append to the list of unmade files.
+
+pass
+
+## Pass unmade files onto batch process
+
+def write_pre(f):
+    f.writelines('\n'.join((pre_doc, '', '')))
+
+def write_page(f, tex):
+    f.write('\n'.join((pre_tex, tex, post_tex, '', '')))
+
+def write_post(f):
+    f.write(post_doc)
+
+def make_preamble():
+    pipe = subprocess.PIPE
+    with open('preamble.tex', 'w') as f:
+        f.write(preamble)
+
+    return subprocess.Popen((
+        'latex','-interaction=batchmode', '-ini',
+        '&latex preamble.tex\dump'), stderr=pipe, stdout=pipe)
+
+def check_preamble(p):
+    p.communicate()
+
+    if p.returncode != 0:
+        raise RuntimeError('Latex was unable to compile the preamble.')
+
+p = make_preamble()
+check_preamble(p)
+
+with open('myoutput.tex', 'w') as f:
+    write_pre(f)
+    for t in texes:
+        write_page(f, t)
+    write_post(f)
+
+## Call latex on file
+def run_latex(texfile):
+    return subprocess.check_call(
+        ('latex','-interaction=batchmode','-fmt','preamble.fmt',texfile),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+run_latex('myoutput.tex')
+
+## Run dvipos
+def run_dvipos(dvifile):
+    return subprocess.check_call(
+        ('dvipos', '-b', dvifile),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+run_dvipos('myoutput.dvi')
+
+p = PosParser()
+stats = p.parse('myoutput.pos')
+
+## Output dimension stats
+
+for text, stats in zip(texes, stats):
+    data[text] = stats
+
+def run_dvisvgm(dvifile):
+    """Convert all pages of dvi file to svgs"""
+    subprocess.check_call(
+        ('dvisvgm', '-b', 'none', '-p', '0-', '-S','-z', '-n', dvifile),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+run_dvisvgm('myoutput.dvi')
+
+data.close()
