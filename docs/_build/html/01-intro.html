@@ -1,0 +1,173 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Introduction &mdash; Crayon v0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Crayon v0.0.1 documentation" href="index.html" />
+    <link rel="prev" title="Welcome to Crayon’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Crayon’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Crayon v0.0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="philosophy">
+<h2>Philosophy<a class="headerlink" href="#philosophy" title="Permalink to this headline">¶</a></h2>
+<p>Crayon is a a library for drawing that aims to make as few assumptions as possible. Where there are two reasonable ways that the same thing can be communicated, both are allowed and simple rules distinguish which is which. One of the most fundamental design principles is that Crayon should avoid unnecessarily breaking programmer flow. It is also designed to be output-format agnostic.</p>
+</div>
+<div class="section" id="the-core">
+<h2>The core<a class="headerlink" href="#the-core" title="Permalink to this headline">¶</a></h2>
+<p>The most fundamental concept of crayon is the marker. Markers are more than simple coordinates - in crayon, a marker is an immutable reference to a point. You can do what you want with it, but it will always point to the same place on the page. Markers are able to be transformed into multiple coordinate spaces.</p>
+</div>
+<div class="section" id="motion">
+<h2>Motion<a class="headerlink" href="#motion" title="Permalink to this headline">¶</a></h2>
+<p>Motion is achieved in multiple ways. Each coordinate can be treated as a function.This can be used to provide an absolute coordinate in a space.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">c</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>There are times when you want to move in a direction relative to the current marker. The following</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">right</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="drawing">
+<h2>Drawing<a class="headerlink" href="#drawing" title="Permalink to this headline">¶</a></h2>
+<p>In order to provide flow, all drawing is performed through markers. Each marker contains a <a href="#id1"><span class="problematic" id="id2">`</span></a>path&#8217;. When a user calls to on a marker, a new marker is constructed with a reference to the previous marker.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">c</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span><span class="mi">20</span><span class="p">)</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Operators act on the list, and these actions usually change some form of mutable state. For instance, in drawing a path, an encapsulation of global state (the graphics context) will be instructed to change its state.</p>
+<p>While most operations are stack based, there are often more conventional counterparts. For instance, c(10,10).rect(20,20) will draw a rectangle that is 20x20 with the bottom-left at the specified point.</p>
+</div>
+<div class="section" id="flow">
+<h2>Flow<a class="headerlink" href="#flow" title="Permalink to this headline">¶</a></h2>
+<p>Suppose we wish to draw relative to the current available space, for example as with ticks along an axis. We probably want to start in the origin, and then switch into paper coordinate space to move by a fixed rather than relative amount.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ticks</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">c</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">x</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">paper</span><span class="o">.</span><span class="n">to</span><span class="o">.</span><span class="n">up</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>When we call paper, we return a view of the current marker in a different coordinate space.</p>
+</div>
+<div class="section" id="spaces">
+<h2>Spaces<a class="headerlink" href="#spaces" title="Permalink to this headline">¶</a></h2>
+<p>By default, there are four space that are commonly used.</p>
+<dl class="docutils">
+<dt>absolute</dt>
+<dd>The space on the page relative to the bottom left of the page. This is largely used internally, and is the simplest of all the spaces.</dd>
+<dt>paper</dt>
+<dd>This is the space you will use the most. It represents the paper on the page, and all dimensions are in millimeters. The origin may not be the bottom left of the page.</dd>
+<dt>plot</dt>
+<dd>This is the space registered with the contextmanager for the current plot. This is only available in contexts where it makes sense.</dd>
+<dt>box</dt>
+<dd>This is a space relative to the current box. (0,0) represents the lower edge of the current box, and (1,1) represents the top right</dd>
+</dl>
+</div>
+<div class="section" id="zooming">
+<h2>Zooming<a class="headerlink" href="#zooming" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes it is necessary to enlarge a region of the current space. Zooming is achieved by putting the diagonal onto the stack and then calling zoom.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">zoomed</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span><span class="mi">50</span><span class="p">)</span><span class="o">.</span><span class="n">zoom</span>
+</pre></div>
+</div>
+<p>Note that the existing marker remains unmodified. There is no operation that changes markers. For this reason, we have adopted the convention of using brackets only after functions which modify the mutable state. These are usually the last things you wish to do, and may or may not return a modified marker.</p>
+<p>This is also very convenient for passing paramters. For instance, the draw, fill, and filldraw actions all take parameters.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Introduction</a><ul>
+<li><a class="reference internal" href="#philosophy">Philosophy</a></li>
+<li><a class="reference internal" href="#the-core">The core</a></li>
+<li><a class="reference internal" href="#motion">Motion</a></li>
+<li><a class="reference internal" href="#drawing">Drawing</a></li>
+<li><a class="reference internal" href="#flow">Flow</a></li>
+<li><a class="reference internal" href="#spaces">Spaces</a></li>
+<li><a class="reference internal" href="#zooming">Zooming</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to Crayon&#8217;s documentation!</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/01-intro.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Crayon’s documentation!"
+             >previous</a> |</li>
+        <li><a href="index.html">Crayon v0.0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Dave Mallows.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
