@@ -8,7 +8,11 @@ import re
 import math
 import shelve
 
-data = shelve.open('foo.db', protocol=1)
+import errno
+import templite
+import tempfile
+import shutil
+
 
 class PosParser(object):
     """Parser for dvipos bounding box output"""
@@ -31,110 +35,117 @@ class PosParser(object):
         return tuple (self._parse_hex(i.group(0))
                       for i in self.numbers.finditer(line))
 
+class Tex(object):
+    def __init__(self, text, dvifile = None, extents = None):
+        self.text = text
+        self.hash = hashlib.md5(text).hexdigest()
+        self.dvifile = dvifile
+        self.extents = extents
 
-## Obtain list of strings to pass through tex
+class TexRunner(object):
+    def __init__(self):
 
-texes = ['Hello World %d' % i for i in xrange(100)]
+        ## todo: For templates: check cwd, then ~/.crayon, then system.
+        self._templatedir = 'templates'
 
-## Generate hash of templates
+        ## Since there's potential to massively save time using caches, allow
+        ## user to set directory (thus they can set /dev/null) or set minimal
+        ## cacheing.
+        base_cachedir = os.path.expanduser('~/.cache/crayon')
 
-def read(file):
-    with open(file) as f:
-        return f.read().strip()
+        preamble = self._template('preamble.tex')
+        body = self._template('body.tpl')
 
-preamble, pre_doc, pre_tex, post_tex, post_doc = (
-    read(os.path.join('templates',i)+'.tex') for i in 
-    ('preamble', 'pre_doc', 'pre_tex', 'post_tex', 'post_doc'))
+        ## Compile the body template using templite (single file, < 50 line
+        ## lightweight and fast templating engine)
+        self._body_tpl = templite.Templite(preamble)
 
-md5sum = hashlib.md5('\n'.join((preamble, pre_doc, pre_tex, post_tex, post_doc)))
+        ## Hash the template. This will form the directory for storage of cache
+        ## files.
+        h = hashlib.md5(preamble)
+        h.update(body)
+        templatehash = h.hexdigest()
 
-## Hash each individual piece of TeX
+        self._cachedir = os.path.join(base_cachedir, templatehash)
 
-def calc_md5(text):
-    md5 = md5sum.copy()
-    md5.update(text)
-    return md5.hexdigest()
+        ## Try and make the cachedir. This way avoids various race conditions
+        ## and is more pythonic than Guido's suggestion.
+        try:
+            os.makedirs(self._cachedir)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST:
+                pass
+            else:
+                raise
 
-md5sums = map(calc_md5, texes)
+        # Open the database
+        self._db = shelve.open(os.path.join(templatehash, ''), protocol=1)
 
-## See if each hash is in the database
+        ## Make a temp dir for running latex and dvipos in
+        self._tempdir = tempfile.mkdtemp(prefix='crayon-')
 
-pass
+        # Batch number, so we can build svgs separately
+        # (Many pages of the dvi file will *not* be needed as SVG.)
+        self._batchnumber = 0
 
-## If the hash is in the database, return the corresponding deferred result
-## object.
+    def close(self):
+        shutil.rmtree(self._tempdir)
+        self._db.close()
 
-pass
+    def render(self, strings):
+        """Batch latexing of a batch of strings"""
+        self._batchnumber += 1
 
-## Otherwise append to the list of unmade files.
+        texes = [Tex(s) for s in strings]
 
-pass
+        self._render_latex()
+        output = 'output-%x.tex' % self._batchnumber
 
-## Pass unmade files onto batch process
+    def _template(self, filename):
+        with open(os.path.join(self._templatedir, filename),'r') as f:
+            return f.read()
 
-def write_pre(f):
-    f.writelines('\n'.join((pre_doc, '', '')))
+    def _cache(self, filename):
+        return os.path.join(self._cachedir, filename)
 
-def write_page(f, tex):
-    f.write('\n'.join((pre_tex, tex, post_tex, '', '')))
+    def _temp(self, filename):
+        return os.path.join(self._tempdir, filename)
 
-def write_post(f):
-    f.write(post_doc)
+    def _render_latex(self, texes):
+        self._write_latex(texes)
 
-def make_preamble():
-    pipe = subprocess.PIPE
-    with open('preamble.tex', 'w') as f:
-        f.write(preamble)
+    def _make_preamble():
+        pipe = subprocess.PIPE
+        with open('preamble.tex', 'w') as f:
+            f.write(preamble)
 
-    return subprocess.Popen((
-        'latex','-interaction=batchmode', '-ini',
-        '&latex preamble.tex\dump'), stderr=pipe, stdout=pipe)
+        self._pre = subprocess.Popen((
+            'latex','-interaction=batchmode', '-ini',
+            '&latex preamble.tex\dump'), cwd=self._tempdir,
+            stderr=pipe, stdout=pipe)
 
-def check_preamble(p):
-    p.communicate()
+    def _check_preamble(self):
+        self._pre.communicate()
 
-    if p.returncode != 0:
-        raise RuntimeError('Latex was unable to compile the preamble.')
+        if self._pre.returncode != 0:
+            raise RuntimeError('Latex was unable to compile the preamble.')
 
-p = make_preamble()
-check_preamble(p)
+    ## Write out tex
+    def _write_tex(self, filename, texes):
+        with open(filename, 'w') as f:
+            f.write(self._body_tpl.render(t.text for t in texes))
 
-with open('myoutput.tex', 'w') as f:
-    write_pre(f)
-    for t in texes:
-        write_page(f, t)
-    write_post(f)
+    ## Call LaTeX on file
+    def _run_latex(self, filename):
+        return subprocess.check_call(
+            ('latex','-interaction=batchmode','-fmt','preamble.fmt',filename),
+            cwd=self._tempdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-## Call latex on file
-def run_latex(texfile):
-    return subprocess.check_call(
-        ('latex','-interaction=batchmode','-fmt','preamble.fmt',texfile),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ## Run dvipos
+    def _run_dvipos(dvifile):
+        return subprocess.check_call(
+            ('dvipos', '-b', dvifile), cwd= self._tempdir,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-run_latex('myoutput.tex')
 
-## Run dvipos
-def run_dvipos(dvifile):
-    return subprocess.check_call(
-        ('dvipos', '-b', dvifile),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-run_dvipos('myoutput.dvi')
-
-p = PosParser()
-stats = p.parse('myoutput.pos')
-
-## Output dimension stats
-
-for text, stats in zip(texes, stats):
-    data[text] = stats
-
-def run_dvisvgm(dvifile):
-    """Convert all pages of dvi file to svgs"""
-    subprocess.check_call(
-        ('dvisvgm', '-b', 'none', '-p', '0-', '-S','-z', '-n', dvifile),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-run_dvisvgm('myoutput.dvi')
-
-data.close()
+TexRunner()
