@@ -123,11 +123,18 @@ class TestModel(unittest.TestCase):
             xticks = Maybe(Int())
 
         self.model = MyModel()
+        self.model2 = MyModel()
+        self.model3 = MyModel()
 
     def test_params(self):
-        print self.model.xticks
         self.model.xticks = 15
-        print self.model.xticks
+        self.assertEquals(self.model.xticks, 15)
+        self.model.xticks = None 
+        self.assertEquals(self.model.xticks, None)
+        self.model.xticks = 15
+        # As it stands at the *moment*, this will fail. I need to fix this,
+        # somehow, but all I can think of is magic.
+        self.assertNotEqual(self.model.xticks, self.model2.xticks)
 
 if __name__ == '__main__':
     unittest.main()

@@ -62,6 +62,11 @@ class Param(object):
         self._value = v
 
         return self
+
+    def __get__(self, obj, type=None):
+        return self.get()
+    def __set__(self, obj, v):
+        self.set(v)
         
 ## Lambdas have known problems when it comes to pickling. Classes are more
 ## solid. Here are some classes!
@@ -223,12 +228,8 @@ class Float(Number):
 from collections import OrderedDict
 
 class ModelMeta(type):
-    @staticmethod
-    def _make_property(obj):
-        return property(lambda s: obj.get(), lambda s, v: obj.set(v))
-
     def __new__(cls, name, bases, attrs):
-        params = [(name, cls._make_property(attrs.pop(name))) for name, obj in attrs.items() if
+        params = [(name, attrs.pop(name)) for name, obj in attrs.items() if
                   isinstance(obj, Param)]
         attrs = dict(attrs.items() + params)
         new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
