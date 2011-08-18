@@ -38,7 +38,7 @@ class Param(object):
         return self._set(self._from_str(v))
 
     def show(self):
-        return self._show(self._to_str())
+        return self._to_str(self._get())
 
     def get(self):
         return self._to_py(self._get())
@@ -63,9 +63,6 @@ class Param(object):
 
         return self
         
-    def __repr__(self):
-        return self.show()
-
 ## Lambdas have known problems when it comes to pickling. Classes are more
 ## solid. Here are some classes!
 
@@ -222,5 +219,22 @@ class Float(Number):
 
     def _from_py(self, v):
         return float(v)
+
+from collections import OrderedDict
+
+class ModelMeta(type):
+    @staticmethod
+    def _make_property(obj):
+        return property(lambda s: obj.get(), lambda s, v: obj.set(v))
+
+    def __new__(cls, name, bases, attrs):
+        params = [(name, cls._make_property(attrs.pop(name))) for name, obj in attrs.items() if
+                  isinstance(obj, Param)]
+        attrs = dict(attrs.items() + params)
+        new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
+        return new_class
+
+class Model(object):
+    __metaclass__ = ModelMeta
 
 a = Boolean()

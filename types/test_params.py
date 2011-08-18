@@ -1,6 +1,6 @@
 import unittest
 import neat 
-from neat import ParseError, TestError, Maybe, String, Int
+from neat import *
 
 class TestBool(unittest.TestCase):
 
@@ -115,6 +115,19 @@ class TestMaybe(unittest.TestCase):
     def test_read(self):
         self.assertEquals(23, self.maybe.read('23').get())
         self.assertRaises(ParseError, self.maybe.read, 'goo')
+
+class TestModel(unittest.TestCase):
+    def setUp(self):
+        class MyModel(Model):
+            label  = String(default='x')
+            xticks = Maybe(Int())
+
+        self.model = MyModel()
+
+    def test_params(self):
+        print self.model.xticks
+        self.model.xticks = 15
+        print self.model.xticks
 
 if __name__ == '__main__':
     unittest.main()
