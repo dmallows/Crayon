@@ -1,14 +1,14 @@
-# The stuff going on here... well, think of these Params as towers.
-# As a parameter is parsed, 
-# Look to Django ORM for where the ideas came from!
-# The rest of the madness is mine.
+# The stuff going on here... well, think of these Params as things that convert
+# between data types. Something like that.
+# Look to Django ORM for where (some of) the ideas came from!
+# The rest of the madness is probably mine.
+
+# Disclaimer:
+# Abandon all hope, ye who enter here.
 
 ## Candidates for moving to an exception module
 
-## FUCK THE NONETYPES!
-## THEY ARE CAUSING ALL OUR PROBLEMS.
-## AND THEY MAY NEVER BE NEEDED!!!
-## AT LEAST FOR MANY THINGS.
+## FECK! NONES!
 
 class Error(Exception):
     def __str__(self):
@@ -29,56 +29,65 @@ class TestError(Error):
 class Param(object):
     # Counter for ordering
     _counter = 0
-    def __init__(self, tests = ()):
+    def __init__(self, test = None, default = None):
         self._counter = Param._counter
         Param._counter += 1
-        self._tests = tests
+        self._test = test
+        self._default = default
+
+    @property
+    def default(self):
+        return self._default
     
-    def read(self, v):
-        return self._set(self._from_str(v))
-
-    def show(self):
-        return self._to_str(self._get())
-
-    def get(self):
-        return self._to_py(self._get())
-
-    def set(self, v):
-        return self._set(self._from_py(v))
+    def from_py(self, v):
+        return self.test(self._from_py(v))
 
     def _from_py(self, v):
         return v
 
+    def to_py(self, v):
+        return self._to_py(v)
+
     def _to_py(self, v):
         return v
 
-    def _get(self):
-        return self._value
+    def from_string(self, v):
+        return self.test(self._from_string(v))
 
-    def _set(self, v):
-        for e in (TestError(f, v) for f in self._tests if f(v) is False):
-            raise e
+    def to_string(self, v):
+        return self._to_string(v)
 
-        self._value = v
-
-        return self
-
-    def __get__(self, obj, type=None):
-        return self.get()
-    def __set__(self, obj, v):
-        self.set(v)
+    def test(self, v):
+        f = self._test
+        if f:
+            f(v)
+        return v
         
 ## Lambdas have known problems when it comes to pickling. Classes are more
 ## solid. Here are some classes!
 
 class RangeTest(object):
-    def __init__(self, a, b):
-        self._r = a, b
+    def __init__(self, min, max):
+        assert(min <= max)
+        self._r = min, max
+
     def __call__(self, v):
         if v is None:
             return True
+
+        result = True
+
         a, b = self._r
-        return (v >= a and v <= b)
+
+        if a is not None:
+            if v < a:
+                raise TestError(self, '%s < %s' % (v,a))
+
+        if b is not None:
+            if v > b:
+                raise TestError(self, '%s > %s' % (v,b))
+
+        return v 
 
 class ElementTest(object):
     def __init__(self, *ps):
@@ -115,42 +124,40 @@ class Maybe(Param):
     def __init__(self, proxy, default = None):
         super(Maybe, self).__init__()
         self._proxy = proxy
-        self.set(default)
 
     def _from_py(self, v):
         # Maybe swallows the value if it's None
         if v is None:
             return
         else:
-            return self._proxy.set(v)
+            return self._proxy.from_py(v)
 
     def _to_py(self, v):
-        try:
-            return v.get()
-        except AttributeError:
-            return
+        if v is None:
+            return None
+        else:
+            return self._proxy.to_py(v)
 
-    def _from_str(self, s):
+    def _from_string(self, s):
         if s is '':
             return
         else:
-            return self._proxy.read(s)
+            return self._proxy.from_string(s)
 
-    def _to_str(self, v):
+    def _to_string(self, v):
         if v is None:
             return ''
         else:
-            return v.show()
+            return self._proxy.to_string(v)
 
 class Boolean(Param):
     def __init__(self, default=False):
-        Param.__init__(self, tests=(ElementTest(True, False),))
-        self.set(default)
+        Param.__init__(self, test=ElementTest(True, False), default=default)
 
-    def _to_str(self):
+    def to_string(self, v):
         return repr(self.get())
 
-    def _from_str(self, v):
+    def _from_string(self, v):
         v = v.strip().lower()
         if v in ('true','t','yes','y','1'):
             return True
@@ -161,59 +168,64 @@ class Boolean(Param):
 
 class String(Param):
     def __init__(self, default=None):
-        Param.__init__(self, tests=(InstanceTest(basestring),))
+        Param.__init__(self, test=InstanceTest(basestring))
 
-    def _from_str(self, v):
+    def _from_string(self, v):
         return v
 
-    def _to_str(self):
-        return self.get()
-
+    def to_string(self, v):
+        return v
 
 class Enum(Param):
     def __init__(self, vals, default = None):
         vals = tuple(v.upper() for v in vals)
-        default = vals[0] if default is None else default
+        default = vals[0] if default is None else default.upper()
+        assert(default in vals)
         
-        super(Enum, self).__init__(tests = (ElementTest(*vals),))
-        self.set(default)
+        super(Enum, self).__init__(test = ElementTest(*vals), default=default)
 
     def _from_py(self, v):
         return v.upper()
     
-    def _from_txt(self, v):
+    def _from_string(self, v):
         return v.upper()
 
-    def _to_txt(self, v):
+    def _to_string(self, v):
         return v.upper()
-
 
 class Number(Param):
     def __init__(self, min=None, max=None, default=0):
-        tests = ()
-        if max is not None or min is not None:
-            tests = (RangeTest(min, max),)
-
-        Param.__init__(self, tests=tests)
-
-        self.set(default)
+        super(Number, self).__init__(test=RangeTest(min, max), default=default)
 
 class Int(Number):
     def show(self):
         v = self.get()
         return '%d' % v if v is not None else ''
 
-    def _from_py(self, v):
+    def from_py(self, v):
         try:
             return int(v)
         except ValueError:
             raise
 
-    def _from_str(self, v):
+    def _from_string(self, v):
         try:
             return int(v)
         except ValueError as e:
             raise ParseError(v, str(e))
+
+    def _to_string(self, v):
+        return '%d' % v
+
+class Float(Number):
+    def _to_str(self, v):
+        return '%g' % v
+
+    def _from_str(self, v):
+        return float(v)
+
+    def _from_py(self, v):
+        return float(v)
 
 class Float(Number):
     def _to_str(self, v):
@@ -229,13 +241,36 @@ from collections import OrderedDict
 
 class ModelMeta(type):
     def __new__(cls, name, bases, attrs):
-        params = [(name, attrs.pop(name)) for name, obj in attrs.items() if
-                  isinstance(obj, Param)]
-        attrs = dict(attrs.items() + params)
+        params = ((name, attrs.pop(name)) for name, obj in attrs.items() if
+                  isinstance(obj, Param))
+        attrs['_params'] = OrderedDict(params)
         new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
         return new_class
 
+class Value(object):
+    def __init__(self, param):
+        self._param = param
+        self._value = param.default
+
+    def get(self):
+        return self._param.to_py(self._value)
+
+    def set(self, v):
+        self._value = self._param.from_py(v)
+
+    value = property(get, set)
+
+    def show(self):
+        return self._param.to_string(self._value)
+
+    def read(self, v):
+        self._value = self._param.from_string(v)
+
+    string = property(show, read)
+
+
 class Model(object):
     __metaclass__ = ModelMeta
-
-a = Boolean()
+    def __init__(self):
+        for name, param in self._params.iteritems():
+            self.__setattr__(name, Value(param))

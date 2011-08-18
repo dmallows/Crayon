@@ -2,6 +2,12 @@ import unittest
 import neat 
 from neat import *
 
+def ricochet_string(obj, v):
+    return obj.to_string(obj.from_string(v))
+
+def ricochet_py(obj, v):
+    return obj.to_py(obj.from_py(v))
+
 class TestBool(unittest.TestCase):
 
     def setUp(self):
@@ -9,27 +15,27 @@ class TestBool(unittest.TestCase):
 
     def test_bool(self):
         # An Integer should make it fail
-        self.assertRaises(ParseError, self.b.read, '23')
+        self.assertRaises(ParseError, self.b.from_string, '23')
         # A random string should make it fail
-        self.assertRaises(ParseError, self.b.read, 'yugga')
+        self.assertRaises(ParseError, self.b.from_string, 'yugga')
 
     def test_bool_true(self):
-        self.assertEqual(True, self.b.set(True).get())
+        self.assertEqual(True, self.b.from_py(True))
 
         # The following should all be parsed as True
         for v in ('yes', 'y', 'true', 't'):
             w = v.upper()
-            self.assertEqual(True, self.b.read(v).get())
-            self.assertEqual(True, self.b.read(w).get())
+            self.assertEqual(True, self.b.from_string(v))
+            self.assertEqual(True, self.b.from_string(w))
 
     def test_bool_false(self):
-        self.assertEqual(False, self.b.set(False).get())
+        self.assertEqual(False, self.b.from_py(False))
 
         # The following should all be parsed as False
         for v in ('no', 'n', 'false', 'f'):
             w = v.upper()
-            self.assertEqual(False, self.b.read(v).get())
-            self.assertEqual(False, self.b.read(w).get())
+            self.assertEqual(False, self.b.from_string(v))
+            self.assertEqual(False, self.b.from_string(w))
 
 class TestString(unittest.TestCase):
 
@@ -55,25 +61,7 @@ class TestEnum(unittest.TestCase):
 
     def test_positives(self):
         for s in self.strings:
-            self.enum.set(s.upper())
-
-class TestInt(unittest.TestCase):
-
-    def setUp(self):
-        self.int = neat.Int()
-
-    def test_positives(self):
-        for x in xrange(100):
-            self.assertEqual(x, self.int.set(x).get())
-
-    def test_range(self):
-        int = neat.Int(10,50,10)
-        for x in xrange(0,10):
-            self.assertRaises(TestError, int.set, x)
-        for x in xrange(10,51):
-            self.assertEqual(x, int.set(x).get())
-        for x in xrange(51, 100):
-            self.assertRaises(TestError, int.set, x)
+            self.assertEquals(ricochet_py(self.enum, s), s.upper())
 
 class TestFloat(unittest.TestCase):
 
@@ -82,16 +70,44 @@ class TestFloat(unittest.TestCase):
 
     def test_positives(self):
         for x in xrange(100):
-            self.assertEqual(0.1*x, self.float.set(0.1*x).get())
+            self.assertEqual(0.1*x, self.float.from_py(0.1*x))
 
     def test_range(self):
         float = neat.Float(1,5,1)
         for x in xrange(0,10):
-            self.assertRaises(TestError, float.set, 0.1*x)
+            self.assertRaises(TestError, float.from_py, 0.1*x)
         for x in xrange(10,51):
-            self.assertEqual(0.1*x, float.set(0.1*x).get())
+            self.assertEqual(0.1*x, ricochet_py(float, 0.1*x))
         for x in xrange(51, 100):
-            self.assertRaises(TestError, float.set, 0.1*x)
+            self.assertRaises(TestError,float.from_py, 0.1*x)
+
+    def test_range(self):
+        float = neat.Float(1,5,1)
+        for x in xrange(0,10):
+            self.assertRaises(TestError, float.from_py, 0.1*x)
+        for x in xrange(10,51):
+            self.assertEqual(0.1*x, ricochet_py(float, 0.1*x))
+        for x in xrange(51, 100):
+            self.assertRaises(TestError,float.from_py, 0.1*x)
+
+class TestFloat(unittest.TestCase):
+
+    def setUp(self):
+        self.float = neat.Float()
+
+    def test_positives(self):
+        for x in xrange(100):
+            self.assertEqual(0.1*x, self.float.from_py(0.1*x))
+
+    def test_range(self):
+        float = neat.Float(1,5,1)
+        for x in xrange(0,10):
+            self.assertRaises(TestError, float.from_py, 0.1*x)
+        for x in xrange(10,51):
+            self.assertEqual(0.1*x, ricochet_py(float, 0.1*x))
+        for x in xrange(51, 100):
+            self.assertRaises(TestError,float.from_py, 0.1*x)
+
 
 class TestMaybe(unittest.TestCase):
 
@@ -100,21 +116,16 @@ class TestMaybe(unittest.TestCase):
         self.str_maybe = Maybe(String())
 
     def test_default(self):
-        self.assertEquals(self.maybe.get(), None)
+        self.assertEquals(self.maybe.default, None)
 
     def test_set(self):
-        self.assertEquals(23, self.maybe.set(23).get())
-        self.assertEquals(None, self.maybe.set(None).get())
-        self.assertRaises(ValueError, self.maybe.set, 'spud')
-
-    def test_set_str(self):
-        self.assertEquals('23', self.str_maybe.set('23').get())
-        self.assertEquals(None, self.str_maybe.set(None).get())
-        self.assertRaises(TestError, self.str_maybe.set, 11)
+        self.assertEquals(23, ricochet_py(self.maybe, 23))
+        self.assertEquals(None, ricochet_py(self.maybe, None))
+        self.assertRaises(ValueError, self.maybe.from_py, 'spud')
 
     def test_read(self):
-        self.assertEquals(23, self.maybe.read('23').get())
-        self.assertRaises(ParseError, self.maybe.read, 'goo')
+        self.assertEquals(23, self.maybe._from_string('23') )
+        self.assertRaises(ParseError, self.maybe._from_string, 'goo')
 
 class TestModel(unittest.TestCase):
     def setUp(self):
@@ -124,18 +135,18 @@ class TestModel(unittest.TestCase):
 
         self.model = MyModel()
         self.model2 = MyModel()
-        self.model3 = MyModel()
 
     def test_params(self):
-        self.model.xticks = 15
-        self.assertEquals(self.model.xticks, 15)
-        self.model.xticks = None 
-        self.assertEquals(self.model.xticks, None)
-        self.model.xticks = 15
+        self.model.xticks
+        self.model.xticks.value = 15
+        self.assertEqual(self.model.xticks.value, 15)
+        self.model.xticks.value = None 
+        self.assertEqual(self.model.xticks.value, None)
+        self.model.xticks.value = 15
+        self.assertRaises(ValueError, self.model.xticks.set,'lol')
         # As it stands at the *moment*, this will fail. I need to fix this,
         # somehow, but all I can think of is magic.
         self.assertNotEqual(self.model.xticks, self.model2.xticks)
 
 if __name__ == '__main__':
     unittest.main()
-
