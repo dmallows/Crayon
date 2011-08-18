@@ -68,7 +68,6 @@ class Param(object):
 
 class RangeTest(object):
     def __init__(self, min, max):
-        assert(min <= max)
         self._r = min, max
 
     def __call__(self, v):
@@ -168,7 +167,7 @@ class Boolean(Param):
 
 class String(Param):
     def __init__(self, default=None):
-        Param.__init__(self, test=InstanceTest(basestring))
+        Param.__init__(self, test=InstanceTest(basestring), default=default)
 
     def _from_string(self, v):
         return v
@@ -265,12 +264,64 @@ class Value(object):
 
     def read(self, v):
         self._value = self._param.from_string(v)
+        
+    def lookup_separated(self, keys):
+        if not keys:
+            return self
+        else:
+            raise RuntimeError('Value has no attributes')
 
     string = property(show, read)
 
-
-class Model(object):
+class NameSpace(object):
     __metaclass__ = ModelMeta
     def __init__(self):
         for name, param in self._params.iteritems():
-            self.__setattr__(name, Value(param))
+            setattr(self, name, param)
+        self._namespaces = OrderedDict()
+
+    def __setattr__(self, name, obj):
+        if isinstance(obj, Param):
+            value = Value(obj)
+            self._params[name] = obj
+            super(NameSpace, self).__setattr__(name, value)
+        elif isinstance(obj, NameSpace):
+            self._namespaces[name] = obj
+            super(NameSpace, self).__setattr__(name, obj)
+        else:
+            super(NameSpace, self).__setattr__(name, obj)
+
+    def lookup(self, key):
+        keys = key.split('.')
+        return self.lookup_separated(keys)
+
+    def lookup_separated(self, keys):
+        if not keys:
+            return self
+        return getattr(self, keys[0]).lookup_separated(keys[1:])
+
+Color = String
+
+# This has the potential to be _VERY_ VERY VERY powerful!
+class Proxy(Param):
+    def __init__(self, dest):
+        self._dest = dest
+
+ # Each Graphic has its own namespace. Each graphic queries some ordered
+ # dictionary. Perhaps.
+
+class TickStyle(NameSpace):
+    def __init__(self, width, length, colour):
+        self.width  = Float(default=width)
+        self.length = Float(default=length)
+        self.color  = Color(default=colour)
+
+class Layer(NameSpace):
+    def __init__(self):
+        super(Layer, self).__init__()
+        self.xticks = TickStyle(0, 0.5, '#fffff')
+
+# There's a slight problem. To avoid duplication, it would _really_ help to have
+# dynamic defaults. But we can't, because of the metaclass shite.
+# We don't need no stinking metaclasses, however!
+

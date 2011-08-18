@@ -129,12 +129,16 @@ class TestMaybe(unittest.TestCase):
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        class MyModel(Model):
+
+        class WhatTheFuck(NameSpace):
+            lolage = String(default='lol')
+        class Parameters(NameSpace):
             label  = String(default='x')
+            lol = WhatTheFuck()
             xticks = Maybe(Int())
 
-        self.model = MyModel()
-        self.model2 = MyModel()
+        self.model = Parameters()
+        self.model2 = Parameters()
 
     def test_params(self):
         self.model.xticks
@@ -147,6 +151,16 @@ class TestModel(unittest.TestCase):
         # As it stands at the *moment*, this will fail. I need to fix this,
         # somehow, but all I can think of is magic.
         self.assertNotEqual(self.model.xticks, self.model2.xticks)
+
+    def test_lookup(self):
+        self.assertEqual(self.model.lookup('lol.lolage').value, 'lol')
+
+class TestLayer(unittest.TestCase):
+    def setUp(self):
+        self.layer = Layer()
+
+    def test_layer(self):
+        print self.layer.xticks.color.value
 
 if __name__ == '__main__':
     unittest.main()
