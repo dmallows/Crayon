@@ -1,6 +1,6 @@
 import unittest
 import neat 
-from neat import ParseError, TestError
+from neat import ParseError, TestError, Maybe, String, Int
 
 class TestBool(unittest.TestCase):
 
@@ -92,6 +92,29 @@ class TestFloat(unittest.TestCase):
             self.assertEqual(0.1*x, float.set(0.1*x).get())
         for x in xrange(51, 100):
             self.assertRaises(TestError, float.set, 0.1*x)
+
+class TestMaybe(unittest.TestCase):
+
+    def setUp(self):
+        self.maybe = Maybe(Int())
+        self.str_maybe = Maybe(String())
+
+    def test_default(self):
+        self.assertEquals(self.maybe.get(), None)
+
+    def test_set(self):
+        self.assertEquals(23, self.maybe.set(23).get())
+        self.assertEquals(None, self.maybe.set(None).get())
+        self.assertRaises(ValueError, self.maybe.set, 'spud')
+
+    def test_set_str(self):
+        self.assertEquals('23', self.str_maybe.set('23').get())
+        self.assertEquals(None, self.str_maybe.set(None).get())
+        self.assertRaises(TestError, self.str_maybe.set, 11)
+
+    def test_read(self):
+        self.assertEquals(23, self.maybe.read('23').get())
+        self.assertRaises(ParseError, self.maybe.read, 'goo')
 
 if __name__ == '__main__':
     unittest.main()

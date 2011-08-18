@@ -11,7 +11,8 @@
 ## AT LEAST FOR MANY THINGS.
 
 class Error(Exception):
-    pass
+    def __str__(self):
+        return '%r: %s' % (self.expr, self.msg)
 
 class ParseError(Error):
     def __init__(self, expr, msg):
@@ -109,8 +110,35 @@ class InstanceTest(object):
 
 ## How?
 class Maybe(Param):
-    def __init__(self, param):
-        self._param = param
+    def __init__(self, proxy, default = None):
+        super(Maybe, self).__init__()
+        self._proxy = proxy
+        self.set(default)
+
+    def _from_py(self, v):
+        # Maybe swallows the value if it's None
+        if v is None:
+            return
+        else:
+            return self._proxy.set(v)
+
+    def _to_py(self, v):
+        try:
+            return v.get()
+        except AttributeError:
+            return
+
+    def _from_str(self, s):
+        if s is '':
+            return
+        else:
+            return self._proxy.read(s)
+
+    def _to_str(self, v):
+        if v is None:
+            return ''
+        else:
+            return v.show()
 
 class Boolean(Param):
     def __init__(self, default=False):
@@ -174,10 +202,16 @@ class Int(Number):
         return '%d' % v if v is not None else ''
 
     def _from_py(self, v):
-        return int(v)
+        try:
+            return int(v)
+        except ValueError:
+            raise
 
     def _from_str(self, v):
-        return int(v)
+        try:
+            return int(v)
+        except ValueError as e:
+            raise ParseError(v, str(e))
 
 class Float(Number):
     def _to_str(self, v):
