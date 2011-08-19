@@ -155,12 +155,34 @@ class TestModel(unittest.TestCase):
     def test_lookup(self):
         self.assertEqual(self.model.lookup('lol.lolage').value, 'lol')
 
+class Layer(NameSpace):
+    def __init__(self):
+        super(Layer, self).__init__()
+        self.xticks = TickStyle(0, 0.5, '#ffffff')
+
+class TickStyle(NameSpace):
+    width  = Float()
+    length = Float()
+    color  = Color()
+
+    def __init__(self, width=None, length=None, color=None):
+        super(TickStyle, self).__init__()
+        self.width.default  = lambda: 2 * self.length.value
+        self.length.default = length
+        self.color.default  = color
+
 class TestLayer(unittest.TestCase):
     def setUp(self):
         self.layer = Layer()
 
     def test_layer(self):
-        print self.layer.xticks.color.value
+        self.assertEqual(self.layer.xticks.color.value, '#ffffff')
+        self.assertEqual(self.layer.xticks.width.value,
+                         2*self.layer.xticks.length.value)
+
+        self.layer.xticks.length.value = 5
+        self.assertEqual(self.layer.xticks.width.value,
+                         2*self.layer.xticks.length.value)
 
 if __name__ == '__main__':
     unittest.main()

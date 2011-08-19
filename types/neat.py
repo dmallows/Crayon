@@ -34,6 +34,10 @@ class Param(object):
         Param._counter += 1
         self._test = test
         self._default = default
+    
+    # The whole defaults thing is a *little* weird. Defaults are *optional* and
+    # totally unchecked at this level! This allows for them to be reset later in
+    # Value.
 
     @property
     def default(self):
@@ -247,23 +251,29 @@ class ModelMeta(type):
         return new_class
 
 class Value(object):
-    def __init__(self, param):
+    def __init__(self, param, default=None):
         self._param = param
-        self._value = param.default
+        self.default = param.default
+        self._value = None
 
     def get(self):
-        return self._param.to_py(self._value)
+        value = self.default if self._value is None else self._value
+        return self._param.to_py(value)
 
     def set(self, v):
         self._value = self._param.from_py(v)
 
+    @property
+    def changed(self):
+        return self._value is not None
+
     value = property(get, set)
 
     def show(self):
-        return self._param.to_string(self._value)
+        return self._param.to_string(self.value)
 
     def read(self, v):
-        self._value = self._param.from_string(v)
+        self.value = self._param.from_string(v)
         
     def lookup_separated(self, keys):
         if not keys:
@@ -272,6 +282,18 @@ class Value(object):
             raise RuntimeError('Value has no attributes')
 
     string = property(show, read)
+
+    def set_default(self, default=None):
+        self._default = self._param.default if default is None else default
+
+    def get_default(self, default=None):
+        try:
+            return self._default()
+        except TypeError:
+            return self._default
+
+
+    default = property(get_default, set_default)
 
 class NameSpace(object):
     __metaclass__ = ModelMeta
@@ -306,22 +328,4 @@ Color = String
 class Proxy(Param):
     def __init__(self, dest):
         self._dest = dest
-
- # Each Graphic has its own namespace. Each graphic queries some ordered
- # dictionary. Perhaps.
-
-class TickStyle(NameSpace):
-    def __init__(self, width, length, colour):
-        self.width  = Float(default=width)
-        self.length = Float(default=length)
-        self.color  = Color(default=colour)
-
-class Layer(NameSpace):
-    def __init__(self):
-        super(Layer, self).__init__()
-        self.xticks = TickStyle(0, 0.5, '#fffff')
-
-# There's a slight problem. To avoid duplication, it would _really_ help to have
-# dynamic defaults. But we can't, because of the metaclass shite.
-# We don't need no stinking metaclasses, however!
 
