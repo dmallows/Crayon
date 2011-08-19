@@ -201,11 +201,7 @@ class Number(Param):
         super(Number, self).__init__(test=RangeTest(min, max), default=default)
 
 class Int(Number):
-    def show(self):
-        v = self.get()
-        return '%d' % v if v is not None else ''
-
-    def from_py(self, v):
+    def _from_py(self, v):
         try:
             return int(v)
         except ValueError:
@@ -230,15 +226,29 @@ class Float(Number):
     def _from_py(self, v):
         return float(v)
 
-class Float(Number):
-    def _to_str(self, v):
-        return '%g' % v
+import re
 
-    def _from_str(self, v):
-        return float(v)
+class Tuple(Number):
+    _r = re.compile(r'\((.*)\)')
+    def __init__(self, *params):
+        default = tuple(i.default for i in params)
+        super(Tuple, self).__init__(default=default)
+        self._params = params
 
-    def _from_py(self, v):
-        return float(v)
+    def _from_py(self, values):
+        return tuple(p.from_py(v) for p, v in zip(self._params, values))
+
+    def _to_py(self, values):
+        return tuple(p.to_py(v) for p, v in zip(self._params, values))
+
+    def _to_string(self, values):
+        return '(%s)' % ', '.join(
+            p.to_string(v) for p, v in zip(self._params, values))
+
+    def _from_string(self, values):
+        return ( p.from_string(v.strip()) for p, v in
+                zip(self._params,
+                    self._r.match(values).group(1).split(',')) )
 
 from collections import OrderedDict
 
@@ -323,9 +333,4 @@ class NameSpace(object):
         return getattr(self, keys[0]).lookup_separated(keys[1:])
 
 Color = String
-
-# This has the potential to be _VERY_ VERY VERY powerful!
-class Proxy(Param):
-    def __init__(self, dest):
-        self._dest = dest
 
