@@ -122,7 +122,6 @@ class InstanceTest(object):
     def __call__(self, v):
         return isinstance(v, self._cls)
 
-## How?
 class Maybe(Param):
     def __init__(self, proxy, default = None):
         super(Maybe, self).__init__()
@@ -252,13 +251,6 @@ class Tuple(Number):
 
 from collections import OrderedDict
 
-class ModelMeta(type):
-    def __new__(cls, name, bases, attrs):
-        params = ((name, attrs.pop(name)) for name, obj in attrs.items() if
-                  isinstance(obj, Param))
-        attrs['_params'] = OrderedDict(params)
-        new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
-        return new_class
 
 class Value(object):
     def __init__(self, param, default=None):
@@ -277,7 +269,10 @@ class Value(object):
     def changed(self):
         return self._value is not None
 
-    value = property(get, set)
+    def reset(self):
+        self._value = None
+
+    value = property(get, set, reset)
 
     def show(self):
         return self._param.to_string(self.value)
@@ -296,32 +291,93 @@ class Value(object):
     def set_default(self, default=None):
         self._default = self._param.default if default is None else default
 
-    def get_default(self, default=None):
+    def get_default(self):
         try:
             return self._default()
         except TypeError:
             return self._default
 
+    def reset_default(self):
+        self._default = self._param.default
 
-    default = property(get_default, set_default)
+
+    default = property(get_default, set_default, reset_default)
+
+class ModelMeta(type):
+    def __new__(cls, name, bases, attrs):
+        params = [(name, attrs.pop(name)) for name, obj in attrs.items() if
+                  isinstance(obj, Param)]
+        attrs['_params'] = params
+        new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
+        return new_class
 
 class NameSpace(object):
     __metaclass__ = ModelMeta
+
     def __init__(self):
-        for name, param in self._params.iteritems():
+        super(NameSpace, self).__init__()
+        params = self._params
+        self._params = OrderedDict()
+        self._all = OrderedDict()
+
+        for name, param in params:
             setattr(self, name, param)
+
         self._namespaces = OrderedDict()
+
+        #print self._params
 
     def __setattr__(self, name, obj):
         if isinstance(obj, Param):
             value = Value(obj)
-            self._params[name] = obj
-            super(NameSpace, self).__setattr__(name, value)
+            self._params[name] = value
+            self._all[name] = value
+            #super(NameSpace, self).__setattr__(name, Proxy(value))
+
         elif isinstance(obj, NameSpace):
             self._namespaces[name] = obj
+            self._all[name] = obj
             super(NameSpace, self).__setattr__(name, obj)
+
+        elif name in self._params:
+            self._params[name].value = obj
+
         else:
             super(NameSpace, self).__setattr__(name, obj)
+
+    def __getattr__(self, name):
+        try:
+            return self._params[name].value
+        except KeyError:
+            return getattr(super(NameSpace, self), name)
+
+    def __delattr__(self, name):
+        try:
+            del self._params[name].value
+        except:
+            raise
+
+    def __getitem__(self, name):
+        try:
+            xs = name.split('.')
+            try:
+                x, = xs
+                try:
+                    return self._params[x]
+                except:
+                    return getattr(self, x)
+            except ValueError: # Couldn't unpack => multiple?
+                return self[xs]
+        except AttributeError: # Couldn't split => list
+            try:
+                return self[name[0]][name[1:]]
+            except TypeError:
+                return self[name[0]]
+
+
+
+    def __setitem__(self, name, value):
+        self._params[name] = value
 
     def lookup(self, key):
         keys = key.split('.')
@@ -330,7 +386,7 @@ class NameSpace(object):
     def lookup_separated(self, keys):
         if not keys:
             return self
-        return getattr(self, keys[0]).lookup_separated(keys[1:])
+        return self[keys[0]].lookup_separated(keys[1:])
 
 Color = String
 

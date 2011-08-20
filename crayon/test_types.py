@@ -1,6 +1,6 @@
 import unittest
-import neat 
-from neat import *
+import crayon.types as types
+from crayon.types import *
 
 def ricochet_string(obj, v):
     return obj.to_string(obj.from_string(v))
@@ -11,7 +11,7 @@ def ricochet_py(obj, v):
 class TestBool(unittest.TestCase):
 
     def setUp(self):
-        self.b = neat.Boolean()
+        self.b = types.Boolean()
 
     def test_bool(self):
         # An Integer should make it fail
@@ -40,7 +40,7 @@ class TestBool(unittest.TestCase):
 class TestString(unittest.TestCase):
 
     def setUp(self):
-        self.b = neat.String()
+        self.b = types.String()
 
     def test_string(self):
         # No heroics - we want the string to just be settable to strings!
@@ -57,7 +57,7 @@ class TestEnum(unittest.TestCase):
 
     def setUp(self):
         self.strings = ('foo', 'bar', 'baz')
-        self.enum = neat.Enum(self.strings)
+        self.enum = types.Enum(self.strings)
 
     def test_positives(self):
         for s in self.strings:
@@ -66,14 +66,14 @@ class TestEnum(unittest.TestCase):
 class TestFloat(unittest.TestCase):
 
     def setUp(self):
-        self.float = neat.Float()
+        self.float = types.Float()
 
     def test_positives(self):
         for x in xrange(100):
             self.assertEqual(0.1*x, self.float.from_py(0.1*x))
 
     def test_range(self):
-        float = neat.Float(1,5,1)
+        float = types.Float(1,5,1)
         for x in xrange(0,10):
             self.assertRaises(TestError, float.from_py, 0.1*x)
         for x in xrange(10,51):
@@ -82,7 +82,7 @@ class TestFloat(unittest.TestCase):
             self.assertRaises(TestError,float.from_py, 0.1*x)
 
     def test_range(self):
-        float = neat.Float(1,5,1)
+        float = types.Float(1,5,1)
         for x in xrange(0,10):
             self.assertRaises(TestError, float.from_py, 0.1*x)
         for x in xrange(10,51):
@@ -93,14 +93,14 @@ class TestFloat(unittest.TestCase):
 class TestFloat(unittest.TestCase):
 
     def setUp(self):
-        self.float = neat.Float()
+        self.float = types.Float()
 
     def test_positives(self):
         for x in xrange(100):
             self.assertEqual(0.1*x, self.float.from_py(0.1*x))
 
     def test_range(self):
-        float = neat.Float(1,5,1)
+        float = types.Float(1,5,1)
         for x in xrange(0,10):
             self.assertRaises(TestError, float.from_py, 0.1*x)
         for x in xrange(10,51):
@@ -141,19 +141,22 @@ class TestModel(unittest.TestCase):
         self.model2 = Parameters()
 
     def test_params(self):
-        self.model.xticks
-        self.model.xticks.value = 15
-        self.assertEqual(self.model.xticks.value, 15)
-        self.model.xticks.value = None 
-        self.assertEqual(self.model.xticks.value, None)
-        self.model.xticks.value = 15
-        self.assertRaises(ValueError, self.model.xticks.set,'lol')
+        self.model.xticks = 15
+        self.assertEqual(self.model.xticks, 15)
+        self.model.xticks = None 
+        self.assertEqual(self.model.xticks, None)
+        self.model.xticks = 15
+        self.assertRaises(ValueError, self.model['xticks'].set,'lol')
         # As it stands at the *moment*, this will fail. I need to fix this,
         # somehow, but all I can think of is magic.
         self.assertNotEqual(self.model.xticks, self.model2.xticks)
 
     def test_lookup(self):
-        self.assertEqual(self.model.lookup('lol.lolage').value, 'lol')
+        print self.model._all
+        print self.model._namespaces
+        print self.model['lol.lolage.value'].value
+        pass
+        #self.assertEqual(self.model.lookup('lol.lolage').value, 'lol')
 
 class MyLayer(NameSpace):
     def __init__(self):
@@ -167,22 +170,22 @@ class MyTickStyle(NameSpace):
 
     def __init__(self, width=None, length=None, color=None):
         super(MyTickStyle, self).__init__()
-        self.width.default  = lambda: 2 * self.length.value
-        self.length.default = length
-        self.color.default  = color
+        self['width'].default  = lambda: 2 * self.length
+        self['length'].default = length
+        self['color'].default  = color
 
 class TestMyLayer(unittest.TestCase):
     def setUp(self):
         self.layer = MyLayer()
 
     def test_layer(self):
-        self.assertEqual(self.layer.xticks.color.value, '#ffffff')
-        self.assertEqual(self.layer.xticks.width.value,
-                         2*self.layer.xticks.length.value)
+        self.assertEqual(self.layer.xticks.color, '#ffffff')
+        self.assertEqual(self.layer.xticks.width,
+                         2*self.layer.xticks.length)
 
-        self.layer.xticks.length.value = 5
-        self.assertEqual(self.layer.xticks.width.value,
-                         2*self.layer.xticks.length.value)
+        self.layer.xticks.length = 5
+        self.assertEqual(self.layer.xticks.width,
+                         2*self.layer.xticks.length)
 
 if __name__ == '__main__':
     unittest.main()
