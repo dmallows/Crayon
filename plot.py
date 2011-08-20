@@ -1,21 +1,5 @@
 import math
 
-class Layer(object):
-    """A layer is a node in a tree, with higher and lower branches."""
-    def __init__(self, lower=None, higher=None):
-        self.higher = () if higher is None else higher
-        self.lower = () if higher is None else higher
-    def set(self, higher = None, lower = None):
-        higher = self.higher if higher is None else higher
-        lower = self.lower if lower is None else lower
-        return Layer(lower, higher)
-
-    def append_below(self, o):
-        self.lower = self.lower
-
-    def append_above(self, o):
-        self.lower = self.lower
-
 ceil = lambda x : int(math.ceil(x))
 floor = lambda x: int(math.floor(x))
 log = math.log
@@ -72,8 +56,8 @@ class LogTicker(object):
 
         return lsum([0.1*i*x for i in xrange(2,10)] for x,_ in self.major[1:])
 
-from context import TikzCanvas
-from spaces import LinSpace, LogSpace, Space2D
+from crayon.contexts.tikz import TikzCanvas
+from crayon.spaces import LinSpace, LogSpace, Space2D
 
 class Histo(Layer):
     def __init__(self, width=160, height=120):

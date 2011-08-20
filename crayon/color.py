@@ -13,7 +13,7 @@ def rgb255_to_rgb(r,g,b):
     s = _scale
     return (s*r, s*g, s*b)
 
-class Gradient(obect):
+class Gradient(object):
     pass
 
 class LinearGradient(Gradient):
@@ -25,7 +25,10 @@ class ColorSpace(object):
         raise NotImplementedError()
 
     def __getattr__(self, attr):
-        return getattr(self.rgb, attr)
+        if hasattr(self.rgb, attr):
+            return getattr(self.rgb, attr)
+        else:
+            raise AttributeError('No such thing!')
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__,
@@ -47,6 +50,10 @@ class Rgb(ColorSpace):
     @property
     def rgb255(self):
         return Rgb255(*rgb_to_rgb255(*self.color))
+
+    @property
+    def hex(self):
+        return self.rgb255.hex
 
 
 class Hsv(ColorSpace):

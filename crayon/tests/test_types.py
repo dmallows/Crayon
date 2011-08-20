@@ -152,11 +152,8 @@ class TestModel(unittest.TestCase):
         self.assertNotEqual(self.model.xticks, self.model2.xticks)
 
     def test_lookup(self):
-        print self.model._all
-        print self.model._namespaces
-        print self.model['lol.lolage.value'].value
+        self.assertEqual(self.model['lol.lolage'].value, 'lol')
         pass
-        #self.assertEqual(self.model.lookup('lol.lolage').value, 'lol')
 
 class MyLayer(NameSpace):
     def __init__(self):

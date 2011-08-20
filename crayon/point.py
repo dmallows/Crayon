@@ -1,11 +1,15 @@
-"""Smart points for a graphics context"""
+"""Smart, immutable points which act as a 'remote control' for a
+graphics context
+
+"""
 
 from math import sqrt
 from spaces import Space2D, LinSpace2D, LinSpace
 
 class Compass(object):
     _norm = lambda x, y: (x/sqrt(2), y/sqrt(2))
-    """Object to store directions. Preferred over a dict for clarity."""
+    """Object to store directions. Preferred over a dict for clarity and
+    for making a more pythonic API."""
     N = up    = (0,1.)
     E = right = (1.,0)
     S = down  = (0,-1.)
@@ -16,7 +20,8 @@ class Compass(object):
     NW = upLeft    = leftUp    = _norm(-1, +1)
     SW = downLeft  = leftDown  = _norm(-1, -1)
 
-    __getitem__ = lambda s, a: getattr(s,a)
+    def __getitem__(self, a):
+        return getattr(self, a)
 
 class Cursor(object):
     """A cursor is a coordinate proxy.  It is always made by another Cursor or a
@@ -24,7 +29,18 @@ class Cursor(object):
     
     compass = Compass()
     
-    def __init__(self, gc, spaces, current, cursor = (0,0), path=(), zooms=()):
+    def __init__(self, gc, spaces, current, cursor = (0,0), path=()):
+        """Initialise a Point. Most points will be created by the
+        stateful graphics context, so constructor is rarely called
+        directly.
+        
+        gc -- A stateful graphics context
+        spaces -- A dictionary of 2D spaces
+        current -- Current space (Default paper)
+        cursor -- (x, y) point of the cursor
+        path -- The currently attached path
+        """
+
         # The graphics context enables drawing
         self._gc = gc
 
@@ -32,7 +48,6 @@ class Cursor(object):
         self._path = path
 
         self._spaces = spaces
-        self._zooms = zooms
 
         # Cursor is in current space, and can be transformed
         # to other spaces.
@@ -40,28 +55,28 @@ class Cursor(object):
         self._current = current if current else paper
 
     def __call__(self, x, y):
-        """Allow absolute coordinate by calling Cursor instances"""
-        return self.set(cursor = (x,y))
+        """Set cursor to coordinate (x, y) in current space"""
+        return self._set(cursor = (x,y))
 
     def __getattr__(self, attr):
-        """Allows compass points to be used"""
+        # Proxy the Compass object
         try:
             dx, dy = self.compass[attr]
             return lambda d: self.move(d * dx, d * dy)
         except AttributeError, e:
             return self._switch_space(attr)
 
-    def set(self, spaces = None, current = None, cursor = None, path = None,
-            zooms = None):
-        spaces  = self._spaces  if spaces  is None else spaces
+    def _set(self, spaces = None, current = None, cursor = None, path = None):
+        """Return a new Cursor, settin any non-none parameters"""
+        path = self._path if path is None else path
+        spaces = self._spaces if spaces is None else spaces
+        cursor = self._cursor if cursor is None else cursor
         current = self._current if current is None else current
-        cursor  = self._cursor  if cursor  is None else cursor
-        path    = self._path    if path    is None else path
-        zooms   = self._zooms   if zooms   is None else zooms
     
         return Cursor(self._gc, spaces, current, cursor, path)
 
     def _lookup_space(self, name):
+        """Lookup space in spaces dictionary"""
         try:
             return self._spaces[name]
         except KeyError, e:
@@ -77,22 +92,22 @@ class Cursor(object):
 
         cursor = newSpace.from_box(oldSpace.to_box(self._cursor))
 
-        return self.set(current = newSpace, cursor = cursor)
+        return self._set(current = newSpace, cursor = cursor)
 
     def __dir__(self):
         return
 
     @property
     def to(self):
-        """Add current point to path"""
+        """Return a new cursor with current cursor added to path"""
         path = self._path + (self, ) 
-        return self.set(path = path)
+        return self._set(path = path)
 
     def move(self, dx, dy):
         """Return a shifted new cursor"""
         cx, cy = self._cursor
         cursor = (cx + dx, cy + dy)
-        return self.set(cursor = cursor)
+        return self._set(cursor = cursor)
 
     def distance_to(self, other):
         """Distance from cursor to another cursor in paper space"""
@@ -115,11 +130,13 @@ class Cursor(object):
             return self.paper.distance_from(other)
         
     def zoom(self):
+        """Zoom into the rectangle with diagonal defined by shortest
+        path between last point and current cursor. Think multi-
+        touch...
+        
+        """
         # This entire function is built from distilled voodoo...
-        # Nobody is sure how it works...
-        # Touch it, nobody knows what will happen...
-        # No, seriously, I have no clue how this works.
-
+        # but it seems to work.
         a = self._path[-1]
         b = self
 
@@ -133,7 +150,7 @@ class Cursor(object):
 
         spaces['box'] = boxspace
 
-        k = self.set(spaces=spaces)
+        k = self._set(spaces=spaces)
 
         x1, y1 = a.paper._cursor
         x2, y2 = b.paper._cursor
@@ -145,11 +162,13 @@ class Cursor(object):
         return self._clear_path().set(spaces=spaces)
 
     def set_plot(self, plot):
+        """Set current plot space."""
         spaces = self._spaces.copy()
         spaces['plot'] = spaces['box'].append(plot)
-        return self.set(spaces=spaces)
+        return self._set(spaces=spaces)
 
     def clear_plot(self):
+        """Clear current plot space."""
         spaces = self._spaces.copy()
         del spaces['plot']
 
@@ -172,15 +191,17 @@ class Cursor(object):
         return self._cursor
 
     def x(self, x):
+        """Return copy of current cursor with new x"""
         _, y = self.pos
-        return self.set(cursor = (x, y))
+        return self._set(cursor = (x, y))
 
     def y(self, y):
+        """Return copy of current cursor with new y"""
         x, _ = self.pos
-        return self.set(cursor = (x, y))
+        return self._set(cursor = (x, y))
 
     def draw(self, *a, **kw):
-        """Draw the currently stored path"""
+        """Draw the currently stored path - mutates context"""
         if self._path:
             return self.end.draw(*a, **kw)
         else:
@@ -188,7 +209,8 @@ class Cursor(object):
             return self._clear_path()
 
     def filldraw(self, *a, **kw):
-        """Fill and draw the currently stored path"""
+        """Filldraw the currently stored path - mutates context"""
+
         if self._path:
             return self.end.filldraw(*a, **kw)
         else:
@@ -196,6 +218,7 @@ class Cursor(object):
             return self._clear_path()
 
     def text(self, label, anchor=None):
+        """Place text at cursor location, using anchor if given"""
         self._gc.text(self, label, anchor)
         return self
 
@@ -208,7 +231,8 @@ class Cursor(object):
             return self._clear_path()
 
     def circle(self):
-        """Create a circle from the last two points of the path and push to
+        # TODO: docstring cleanup!
+        """Create a circle with centre and radius the last two points of the path and push to
         stack"""
         centre = self._path[-1]
         radius = self.distance()
@@ -217,7 +241,7 @@ class Cursor(object):
 
     def _clear_path(self):
         """Clear the currently stored path"""
-        return self.set(path = ())
+        return self._set(path = ())
 
     @property
     def rect(self):
@@ -233,4 +257,3 @@ class Cursor(object):
 
     def __repr__(self):
         return '<Cursor(%g,%g)>' % self._cursor
-

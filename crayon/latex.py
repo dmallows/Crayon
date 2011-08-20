@@ -1,8 +1,6 @@
 #! /usr/bin/python
 import hashlib
-import Queue
 
-import atexit
 import subprocess
 import os
 import re
@@ -21,6 +19,7 @@ class PosParser(object):
         self.numbers = re.compile(r'[0-9.A-F-]+')
 
     def parse(self, filename):
+        """Open given filename, return list of extents"""
         with open(filename, 'r') as file:
             matches = (self.bbline.match(line) for line in file)
             return [self._parse_line(match.group(2))
@@ -109,7 +108,11 @@ class TexRunner(object):
             pass
 
     def render(self, strings):
-        """Batch latexing of a batch of strings"""
+        """Batch latexing of a list of strings. Returns list of Tex
+        objects.
+        
+        """
+        
         self._batchnumber += 1
 
         basefile = 'output-%d' % self._batchnumber
@@ -144,6 +147,23 @@ class TexRunner(object):
             tex.dvifile = dvifile
             tex.dvipath = self._tempdir
 
+        return texes
+
+    def to_svg(self, texes):
+        # Basic algorithm: work out which dvifiles are needed. Then we *could*
+        # use dviconcat to join them all together! This is work for another day!
+        # Let us get tikz output first... then worry about this later!
+
+        # For now, let's just note there is a big speedup to be had...
+        # Originally, the plan was to have a 'rater', analogous to PyX. This
+        # would assign 'silliness' to various scenarious, and reject overlapping
+        # text. 
+
+        # This has been abandoned, for now. So all this function needs to do is
+        # to go through the list of texes. It should almost certainly group
+        # though. Dammit!
+
+        
         return texes
 
     def _get_tex(self, string):
@@ -216,10 +236,3 @@ class TexRunner(object):
             ('dvipos', '-b', dvifile), cwd = self._tempdir,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-import contextlib
-t = TexRunner()
-t.render(['hello $world', 'bugger', 'what the fuck', r'\tortoise', 'next one',
-          r'food and \arseholes sit tight!'])
-t2 = t.render(['hello $world', 'bugger', 'what the fuck', r'\tortoise', 'next one',
-          r'food and \arseholes sit tight!'])
-t.close()

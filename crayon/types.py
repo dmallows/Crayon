@@ -1,78 +1,105 @@
-# The stuff going on here... well, think of these Params as things that convert
-# between data types. Something like that.
-# Look to Django ORM for where (some of) the ideas came from!
-# The rest of the madness is probably mine.
+"""Validating type system and simple types. It is worth noting that Type objects
+only contain information for validation, and a default value. The decision to
+use objects to represent types. Inspired by, though no patch on, Haskell's type
+system.
 
-# Disclaimer:
-# Abandon all hope, ye who enter here.
+Types are class objects, and are transformed using a (simple!) metaclass. When a
+NameSpace is instanciated, Value objects are created for each field. These
+(confusingly) can contain their own, settable default value, which overrides the
+Type's if set. These values contain the current setting, and within a namespace
+behave like actual instance objects rather seamlessly.
 
-## Candidates for moving to an exception module
+Children can inherit this behaviour, providing they call the init function.
+"""
 
-## FECK! NONES!
+# Disclaimer: Abandon all hope, ye who enter here.  There is probably far deeper
+# magic than we will ever need...  But this is the way the vision came.  So, it
+# stays for now!
+
+# TODO: cleanup these exceptions - they're copy & pasted from the python docs!
+
+import re # TODO: remove
+from collections import OrderedDict
+
+# =====================
+# ===== ERRORS ========
+# =====================
 
 class Error(Exception):
+    """Generic module Error class, as recommended by Python docs."""
     def __str__(self):
         return '%r: %s' % (self.expr, self.msg)
 
 class ParseError(Error):
+    """A string could not be parsed"""
     def __init__(self, expr, msg):
         self.expr = expr
         self.msg = msg
 
 class TestError(Error):
+    """A test failed to pass"""
     def __init__(self, expr, msg):
         self.expr = expr
         self.msg = msg
     def __str__(self):
         return '%s: %s' % (self.expr.__class__.__name__, self.msg)
 
-class Param(object):
-    # Counter for ordering
+class Type(object):
+    """Base type class"""
+    # Counter for ordering (stolen from Django)
     _counter = 0
     def __init__(self, test = None, default = None):
-        self._counter = Param._counter
-        Param._counter += 1
+        self._counter = Type._counter
+        Type._counter += 1
         self._test = test
         self._default = default
     
-    # The whole defaults thing is a *little* weird. Defaults are *optional* and
-    # totally unchecked at this level! This allows for them to be reset later in
-    # Value.
-
     @property
     def default(self):
+        """Read only default value for the type."""
         return self._default
     
     def from_py(self, v):
+        """Convert from python representation and validate"""
         return self.test(self._from_py(v))
 
     def _from_py(self, v):
         return v
 
     def to_py(self, v):
+        """Convert from internal representation to python representation"""
         return self._to_py(v)
 
     def _to_py(self, v):
         return v
 
     def from_string(self, v):
+        """Convert from string and validate"""
         return self.test(self._from_string(v))
 
     def to_string(self, v):
+        """Convert to string"""
         return self._to_string(v)
 
     def test(self, v):
+        """Test the value against the registered tests."""
         f = self._test
         if f:
             f(v)
         return v
+
+#================================
+#========== TESTS ===============
+#================================
         
-## Lambdas have known problems when it comes to pickling. Classes are more
-## solid. Here are some classes!
+# Lambdas have known problems when it comes to pickling. Classes are more solid.
+# Here are some classes!  The only requirement of tests is that they are
+# callable. So a lambda or a (nested) function is **just** as legitimate.
 
 class RangeTest(object):
-    def __init__(self, min, max):
-        self._r = min, max
+    """Check a number is within defined range"""
+    def __init__(self, min_ = None, max_ = None):
+        self._r = min_, max_
 
     def __call__(self, v):
         if v is None:
@@ -90,15 +117,17 @@ class RangeTest(object):
             if v > b:
                 raise TestError(self, '%s > %s' % (v,b))
 
-        return v 
+        return v
 
 class ElementTest(object):
+    """Check that value is in a given set, naive way"""
     def __init__(self, *ps):
-        self._ps = ps
+        self._ps = set(ps)
     def __call__(self, v):
         return (v in self._ps)
 
 class ShallowElementTest(object):
+    """Check that value is in a given set, using weak equality"""
     def __init__(self, *ps):
         self._ps = ps
     def __call__(self, v):
@@ -108,6 +137,7 @@ class ShallowElementTest(object):
         return False
 
 class DeepElementTest(object):
+    """Check that value is in a given set in a referentially transparent way"""
     def __init__(self, *ps):
         self._ps = ps
     def __call__(self, v):
@@ -117,44 +147,21 @@ class DeepElementTest(object):
         return False
 
 class InstanceTest(object):
+    """Check that passed item is an instance of a given class"""
     def __init__(self, cls):
         self._cls = cls
     def __call__(self, v):
         return isinstance(v, self._cls)
 
-class Maybe(Param):
-    def __init__(self, proxy, default = None):
-        super(Maybe, self).__init__()
-        self._proxy = proxy
+# TODO: Combinations
 
-    def _from_py(self, v):
-        # Maybe swallows the value if it's None
-        if v is None:
-            return
-        else:
-            return self._proxy.from_py(v)
+#================================
+#========== TYPES ===============
+#================================
 
-    def _to_py(self, v):
-        if v is None:
-            return None
-        else:
-            return self._proxy.to_py(v)
-
-    def _from_string(self, s):
-        if s is '':
-            return
-        else:
-            return self._proxy.from_string(s)
-
-    def _to_string(self, v):
-        if v is None:
-            return ''
-        else:
-            return self._proxy.to_string(v)
-
-class Boolean(Param):
+class Boolean(Type):
     def __init__(self, default=False):
-        Param.__init__(self, test=ElementTest(True, False), default=default)
+        super(Boolean, self).__init__(test=ElementTest(True, False), default=default)
 
     def to_string(self, v):
         return repr(self.get())
@@ -168,9 +175,9 @@ class Boolean(Param):
         else:
             raise ParseError(v,"Couldn't parse")
 
-class String(Param):
+class String(Type):
     def __init__(self, default=None):
-        Param.__init__(self, test=InstanceTest(basestring), default=default)
+        super(String, self).__init__(test=InstanceTest(basestring), default=default)
 
     def _from_string(self, v):
         return v
@@ -178,7 +185,7 @@ class String(Param):
     def to_string(self, v):
         return v
 
-class Enum(Param):
+class Enum(Type):
     def __init__(self, vals, default = None):
         vals = tuple(v.upper() for v in vals)
         default = vals[0] if default is None else default.upper()
@@ -195,7 +202,12 @@ class Enum(Param):
     def _to_string(self, v):
         return v.upper()
 
-class Number(Param):
+#TODO: represent colors as a proper type!
+Color = String
+
+# Numeric types
+
+class Number(Type):
     def __init__(self, min=None, max=None, default=0):
         super(Number, self).__init__(test=RangeTest(min, max), default=default)
 
@@ -225,9 +237,16 @@ class Float(Number):
     def _from_py(self, v):
         return float(v)
 
-import re
+# Polymorphic types (ah yes...)
+# It is said that a lot of large scale projects end up re-implementing most
+# features of Lisp. It seems that I am re-implementing much of the features of
+# Haskell. Python actually makes this *easier* than Haskell (I have a
+# disposition towards this kind of thing...). 
 
-class Tuple(Number):
+class Tuple(Type):
+    """Analogue of Python tuples"""
+    # TODO: remove regexp. (Serious bugs e.g. parsing strings). Use recursive
+    # descent parser instead.
     _r = re.compile(r'\((.*)\)')
     def __init__(self, *params):
         default = tuple(i.default for i in params)
@@ -249,8 +268,36 @@ class Tuple(Number):
                 zip(self._params,
                     self._r.match(values).group(1).split(',')) )
 
-from collections import OrderedDict
+class Maybe(Type):
+    """Type representing optional parameters"""
+    def __init__(self, proxy, default = None):
+        super(Maybe, self).__init__()
+        self._proxy = proxy
 
+    def _from_py(self, v):
+        # Maybe swallows the value if it's None
+        if v is None:
+            return
+        else:
+            return self._proxy.from_py(v)
+
+    def _to_py(self, v):
+        if v is None:
+            return None
+        else:
+            return self._proxy.to_py(v)
+
+    def _from_string(self, s):
+        if s is '':
+            return
+        else:
+            return self._proxy.from_string(s)
+
+    def _to_string(self, v):
+        if v is None:
+            return ''
+        else:
+            return self._proxy.to_string(v)
 
 class Value(object):
     def __init__(self, param, default=None):
@@ -306,10 +353,11 @@ class Value(object):
 class ModelMeta(type):
     def __new__(cls, name, bases, attrs):
         params = [(name, attrs.pop(name)) for name, obj in attrs.items() if
-                  isinstance(obj, Param)]
+                  isinstance(obj, Type)]
         attrs['_params'] = params
         new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
         return new_class
+
 
 class NameSpace(object):
     __metaclass__ = ModelMeta
@@ -325,10 +373,8 @@ class NameSpace(object):
 
         self._namespaces = OrderedDict()
 
-        #print self._params
-
     def __setattr__(self, name, obj):
-        if isinstance(obj, Param):
+        if isinstance(obj, Type):
             value = Value(obj)
             self._params[name] = value
             self._all[name] = value
@@ -374,19 +420,5 @@ class NameSpace(object):
             except TypeError:
                 return self[name[0]]
 
-
-
     def __setitem__(self, name, value):
         self._params[name] = value
-
-    def lookup(self, key):
-        keys = key.split('.')
-        return self.lookup_separated(keys)
-
-    def lookup_separated(self, keys):
-        if not keys:
-            return self
-        return self[keys[0]].lookup_separated(keys[1:])
-
-Color = String
-
