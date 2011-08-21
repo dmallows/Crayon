@@ -11,7 +11,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
    
-   01-intro.rst
+   intro
+   spaces
+   cursor
 
 Indices and tables
 ==================
