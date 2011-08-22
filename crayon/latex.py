@@ -12,6 +12,9 @@ import templite
 import tempfile
 import shutil
 
+import itertools
+import glob
+
 class PosParser(object):
     """Parser for dvipos bounding box output"""
     def __init__(self):
@@ -35,12 +38,14 @@ class PosParser(object):
                       for i in self.numbers.finditer(line))
 
 class Tex(object):
-    def __init__(self, text, dvifile = None, dvipath = None, extents = None):
+    def __init__(self, text, dvifile = None, dvipage = None, extents = None,
+                 svgfile = None):
         self.text = text
         self.hash = hashlib.md5(text).hexdigest()
         self.dvifile = dvifile
-        self.dvipath = dvipath
+        self.dvipage = dvipage
         self.extents = extents
+        self.svgfile = svgfile
 
 class TexRunner(object):
     def __init__(self):
@@ -101,19 +106,11 @@ class TexRunner(object):
         shutil.rmtree(self._tempdir)
         self._db.close()
 
-    def __del__(self):
-        try:
-            close()
-        except:
-            pass
-
-    def render(self, strings):
+    def render(self, strings, force=False):
         """Batch latexing of a list of strings. Returns list of Tex
         objects.
         
         """
-        
-        self._batchnumber += 1
 
         basefile = 'output-%d' % self._batchnumber
         texfile  = basefile + '.tex'
@@ -123,11 +120,14 @@ class TexRunner(object):
 
         self._check_preamble()
 
-        unknowns = [t for t in texes if t.extents is None]
+        # If the force option is on, build *ALL* the tex given!
+        unknowns = texes if force else [t for t in texes if t.extents is None]
 
         # Quit now if we don't need to run latex
         if not unknowns:
             return texes
+
+        self._batchnumber += 1
 
         self._write_latex(self._temp(texfile), unknowns)
 
@@ -141,15 +141,21 @@ class TexRunner(object):
 
         extents = self._posparser.parse(self._temp(posfile))
 
-        for tex, ext in zip(unknowns, extents):
+        for n, (tex, ext) in enumerate(zip(unknowns, extents), 1):
             tex.extents = ext
             self._db[tex.text] = ext
             tex.dvifile = dvifile
-            tex.dvipath = self._tempdir
+            tex.dvipage = n
 
         return texes
 
-    def to_svg(self, texes):
+    def to_svg(self, texes, force=False):
+        """Ensure given tex objects have a valid svg object
+        
+        texes -- list of tex objects to be converted.
+        force -- when True, build even when available in cache.
+        
+        """
         # Basic algorithm: work out which dvifiles are needed. Then we *could*
         # use dviconcat to join them all together! This is work for another day!
         # Let us get tikz output first... then worry about this later!
@@ -163,8 +169,39 @@ class TexRunner(object):
         # to go through the list of texes. It should almost certainly group
         # though. Dammit!
 
-        
+        #filter for any that do not exist in svgcache...
+        svgnames = [self._cache(tex.hash + '.svg') for tex in texes]
+
+        # Populate svgfiles with names for those that are known
+        for svgfile, tex in zip(svgnames, texes):
+            if os.path.isfile(svgfile):
+                tex.svgfile = svgfile
+
+        unmade = texes if force else [i for i in texes if i.svgfile is None]
+
+        unmade = sorted(unmade, key=lambda self: self.dvifile)
+
+        # filter
+
+        groups = itertools.groupby(unmade, lambda self: self.dvifile)
+
+        for group, xs in groups:
+            if group is None:
+                xs = self.render((x.text for x in xs), force=True)
+                group = xs[0].dvifile
+
+            pages = sorted(x.dvipage for x in xs)
+            dviname = self._temp(group)
+            self._run_dvisvgm(dviname)
+            oldsvgs = glob.glob('%s-*' % dviname[:-4])
+            oldsvgs.sort()
+            for tex, oldsvg in zip(xs, oldsvgs):
+                newsvg = self._cache(tex.hash + '.svg')
+                os.rename(oldsvg, newsvg)
+                tex.svgfile = newsvg 
+                
         return texes
+
 
     def _get_tex(self, string):
         t = None
@@ -176,8 +213,8 @@ class TexRunner(object):
             try:
                 t.extents = self._db[string]
             except KeyError, e:
-                print "Couldn't look up", e
                 pass
+
         return t
 
     def _template(self, filename):
@@ -236,3 +273,17 @@ class TexRunner(object):
             ('dvipos', '-b', dvifile), cwd = self._tempdir,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
+    ## Run dvisvgm
+    def _run_dvisvgm(self, dvifile, pages=None):
+        pipe = subprocess.PIPE
+        pagestring = '0-' if pages is None\
+                          else ','.join(map(str,sorted(pages)))
+        subprocess.check_call(
+            ('dvisvgm', '-S', '-n', '--bbox=none','-p', pagestring, dvifile),
+            cwd = self._tempdir, stdout=pipe, stderr=pipe)
+
+    def __del__(self):
+        try:
+            close()
+        except:
+            pass
