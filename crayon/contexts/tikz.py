@@ -4,8 +4,8 @@ from exceptions import RuntimeError
 from math import sqrt, log
 #import cairo
 
-from point import Cursor
-from spaces import LinSpace, Space2D, BoxSpace, LogSpace
+from crayon.point import Cursor
+from crayon.spaces import LinSpace, Space2D, BoxSpace, LogSpace
 ##from affine import Affine2D
 
 class TikzCanvas(object):

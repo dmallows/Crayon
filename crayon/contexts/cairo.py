@@ -1,16 +1,33 @@
 from math import pi
-from spaces import Space2D, LinSpace, BoxSpace
+from crayon.spaces import Space2D, LinSpace, BoxSpace
+from crayon.point import Cursor
 
 # We really need to know exactly how wide each string will be, so that when it
 # is placed within a box, the box can be resized accordingly.
 
-class CairoContext(object):
+def mm_to_pspt(x):
+    return 2.83464567 * x
+
+def pspt_to_mm(x):
+    return 0.352777778 * x
+
+def mm_to_texpt(x):
+    return 2.84527559 * x
+
+def texpt_to_mm(x):
+    return 0.351459804 * x
+
+class CairoCanvas(object):
     """Low-level stateful graphics context"""
     def __init__(self,context, width, height):
         paper = Space2D(LinSpace(0,width),LinSpace(0, height))
         self._scopes = dict(box = BoxSpace(), paper = paper, absolute=paper)
         self._default = paper
         self.context = context
+        self._textcache = set()
+        s = mm_to_pspt(1.0)
+        context.scale(s,s)
+        context.set_line_width(texpt_to_mm(1.0))
 
     def push_path(self, markers, closed=False):
         """Draws a path of markers"""
@@ -18,6 +35,8 @@ class CairoContext(object):
         c.move_to(*markers[0].absolute.pos)
         for m in markers:
             c.line_to(*m.absolute.pos)
+        if closed:
+            c.close_path()
 
     def cursor(self):
         return Cursor(self, self._scopes, self._default)
@@ -38,4 +57,4 @@ class CairoContext(object):
         self.context.fillstroke()
 
     def text(self, pos, label, anchor=None):
-        self.textcache.add
+        self._textcache.add(label)
