@@ -31,7 +31,8 @@ class PosParser(object):
     def _parse_hex(self, hex):
         a, b = hex.split('.')
         a, b = int(a), int(b, 16)
-        return a + math.copysign(b,a)/65536.0
+        c = a + math.copysign(b,a)/65536.0
+        return c
 
     def _parse_line(self, line):
         return tuple (self._parse_hex(i.group(0))
@@ -193,7 +194,7 @@ class TexRunner(object):
             pages = sorted(x.dvipage for x in xs)
             dviname = self._temp(group)
             self._run_dvisvgm(dviname)
-            oldsvgs = glob.glob('%s-*' % dviname[:-4])
+            oldsvgs = glob.glob('%s*.svg' % dviname[:-4])
             oldsvgs.sort()
             for tex, oldsvg in zip(xs, oldsvgs):
                 newsvg = self._cache(tex.hash + '.svg')

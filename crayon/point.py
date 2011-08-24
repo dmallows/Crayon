@@ -21,7 +21,10 @@ class Compass(object):
     SW = downLeft  = leftDown  = _norm(-1, -1)
 
     def __getitem__(self, a):
-        return getattr(self, a)
+        try:
+            return getattr(self, a)
+        except AttributeError, e:
+            raise KeyError('Not in Compass: %s' % a)
 
 class Cursor(object):
     """A cursor is a coordinate proxy.  It is always made by another Cursor or a
@@ -63,7 +66,7 @@ class Cursor(object):
         try:
             dx, dy = self.compass[attr]
             return lambda d: self.move(d * dx, d * dy)
-        except AttributeError, e:
+        except KeyError, e:
             return self._switch_space(attr)
 
     def _set(self, spaces = None, current = None, cursor = None, path = None):
@@ -159,7 +162,7 @@ class Cursor(object):
 
         spaces['paper'] = boxspace.append(LinSpace2D(0,0,dx,dy))
 
-        return self._clear_path().set(spaces=spaces)
+        return self._clear_path()._set(spaces=spaces)
 
     def set_plot(self, plot):
         """Set current plot space."""

@@ -7,10 +7,10 @@ class TestTexRunner(unittest.TestCase):
         self.tex = tex.TexRunner()
 
     def test_svgs(self):
-        texes = self.tex.render(['%05d' % i for i in xrange(10000)])
+        texes = self.tex.render(['%05d' % i for i in xrange(1000)])
         print 'Done Tex'
         self.tex.to_svg(texes)
-            
+
     def tearDown(self):
         self.tex.close()
 
