@@ -206,5 +206,5 @@ class Histo1D(Plot):
         self._drawall = [self.frame, self.x.ticks, self.y.ticks, self.data]
 
     def draw(self, c):
-        c = c.box(0.2, 0.2).to(0.8, 0.8).zoom()
+        c = c(10,5).to(75,55).zoom()
         super(Histo1D, self).draw(c)

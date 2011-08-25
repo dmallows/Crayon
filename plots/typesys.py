@@ -419,3 +419,15 @@ class NameSpace(object):
                 return self[name[0]][name[1:]]
             except TypeError:
                 return self[name[0]]
+
+    def namespaces(self):
+        names = OrderedDict()
+        for i in dir(self):
+            v = getattr(self, i)
+            if isinstance(v, NameSpace):
+                names[i] = v
+                
+        return names
+
+    def params(self):
+        return self._params

@@ -20,6 +20,8 @@ class GraphWindow(gtk.Window):
         self.add(self.da)
         self._paper_size = 80.0,60.0
         self._tr = tr
+        self.surf = None
+        self.size = None
 
     def redraw(self, da, clip):
         c = da.window.cairo_create()
@@ -44,16 +46,33 @@ class GraphWindow(gtk.Window):
         c.translate(hdw, hdh)
         c.scale(ratio, ratio)
         c.fill()
+        
 
         c.set_source_rgb(1,1,1)
         c.rectangle(0,0,*self._paper_size)
         c.fill()
 
+        surf = self.surf
 
-        c.set_source_rgb(0, 0, 0)
-        canvas = CairoCanvas(c, self._tr, *self._paper_size)
-        self._plot.draw(canvas.cursor())
+        if surf is None:
+            c.push_group()
 
+            c.set_source_rgb(0, 0, 0)
+            canvas = CairoCanvas(c, self._tr, *self._paper_size)
+            self._plot.draw(canvas.cursor())
+
+            surf = c.pop_group()
+            self.surf = surf
+
+        elif self.size != (w, h):
+            self.surf = None 
+            da.queue_draw()
+
+        c.set_source(surf)
+
+        c.paint()
+
+        self.size = w, h
         return False
 
     def show(self):
@@ -63,9 +82,9 @@ class GraphWindow(gtk.Window):
         gtk.main()
 
 histo = layers.Histo1D(title='My Pretty Plot')
-tr = TexRunner()
 
 def show(plot = None):
+    tr = TexRunner()
     win = GraphWindow(tr, plot)
     try:
         win.show()
