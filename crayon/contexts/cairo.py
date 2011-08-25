@@ -76,13 +76,12 @@ class CairoCanvas(object):
         c.translate(x,y)
         c.push_group()
         c.scale(s,s)
-        # I'm not sure if this *is* needed
-        y0, ymin, xmin, ymax, xmax, yn = [PT2TP * i for i in tex.extents]
+
+        y0, ymin, xmin, ymax, xmax, yn = tex.extents
 
 
         height = ymax - ymin
         width = xmax - xmin
-        print width, height
         c.translate(-xmin, -ymin)
         dx, dy = anchor
 

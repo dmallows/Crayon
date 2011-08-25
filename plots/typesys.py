@@ -311,6 +311,9 @@ class Value(object):
 
     def set(self, v):
         self._value = self._param.from_py(v)
+        if hasattr(self, 'on_changed'):
+            self.on_changed()
+
 
     @property
     def changed(self):
@@ -326,6 +329,8 @@ class Value(object):
 
     def read(self, v):
         self.value = self._param.from_string(v)
+        if hasattr(self, on_changed):
+            self.on_changed()
         
     def lookup_separated(self, keys):
         if not keys:
@@ -336,7 +341,17 @@ class Value(object):
     string = property(show, read)
 
     def set_default(self, default=None):
-        self._default = self._param.default if default is None else default
+        if hasattr(self, 'default'):
+            old_default = self._default
+            self._default = self._param.default if default is None else default
+
+            if self.changed and default != old_default and hasattr(
+                self, 'on_changed'):
+                self.on_changed()
+
+        else:
+            self._default = default
+
 
     def get_default(self):
         try:
@@ -431,3 +446,10 @@ class NameSpace(object):
 
     def params(self):
         return self._params
+
+    def fmap(self, f):
+        """Maps a function f(x) over each leaf of the structure"""
+        for i in self.namespaces().values():
+            i.fmap(f)
+        for p in self.params().values():
+            f(p)

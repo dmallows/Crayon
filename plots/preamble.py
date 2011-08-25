@@ -6,6 +6,13 @@ import cairo
 from crayon.latex import TexRunner
 from crayon.contexts.cairo import CairoCanvas
 import plots.layers as layers
+import time
+
+# Sprinkling of magic...
+def refresh_gui(delay=0):
+    while gtk.events_pending():
+        gtk.main_iteration_do(block=False)
+        time.sleep(delay)
 
 class GraphWindow(gtk.Window):
     """Handles the scaling from paper space to device space
@@ -20,8 +27,7 @@ class GraphWindow(gtk.Window):
         self.add(self.da)
         self._paper_size = 80.0,60.0
         self._tr = tr
-        self.surf = None
-        self.size = None
+        self.quit = False
 
     def redraw(self, da, clip):
         c = da.window.cairo_create()
@@ -52,42 +58,44 @@ class GraphWindow(gtk.Window):
         c.rectangle(0,0,*self._paper_size)
         c.fill()
 
-        surf = self.surf
+        c.set_source_rgb(0, 0, 0)
+        canvas = CairoCanvas(c, self._tr, *self._paper_size)
+        self._plot.draw(canvas.cursor())
 
-        if surf is None:
-            c.push_group()
-
-            c.set_source_rgb(0, 0, 0)
-            canvas = CairoCanvas(c, self._tr, *self._paper_size)
-            self._plot.draw(canvas.cursor())
-
-            surf = c.pop_group()
-            self.surf = surf
-
-        elif self.size != (w, h):
-            self.surf = None 
-            da.queue_draw()
-
-        c.set_source(surf)
-
-        c.paint()
-
-        self.size = w, h
         return False
 
+    def destroy(self, w):
+        self.quit = True
+
     def show(self):
-        self.da.connect('expose-event', self.redraw)
-        self.connect('destroy', lambda w: gtk.main_quit())
-        self.show_all()
-        gtk.main()
+        if not self.quit:
+            self.da.connect('expose-event', self.redraw)
+            self.connect('destroy', self.destroy)
+            self.show_all()
+            refresh_gui()
+        else:
+            raise RuntimeError('Window has been closed by user')
 
 histo = layers.Histo1D(title='My Pretty Plot')
+tr = TexRunner()
+win = GraphWindow(tr, histo)
 
-def show(plot = None):
-    tr = TexRunner()
-    win = GraphWindow(tr, plot)
+def on_changed():
+    win.queue_draw()
+
+def fmap_helper(self):
+    self.on_changed = on_changed
+
+histo.fmap(fmap_helper)
+
+def show():
+    global win
+
     try:
         win.show()
     except KeyboardInterrupt, e:
         win.destroy()
+    except RuntimeError:
+        win = GraphWindow(tr, histo)
+        win.show()
 
