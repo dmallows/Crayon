@@ -220,9 +220,9 @@ class Cursor(object):
             self._gc.filldraw(*a, **kw)
             return self._clear_path()
 
-    def text(self, label, anchor=None):
+    def text(self, label, **kwargs):
         """Place text at cursor location, using anchor if given"""
-        self._gc.text(self, label, anchor)
+        self._gc.text(self, label, **kwargs)
         return self
 
     def fill(self, *a, **kw):

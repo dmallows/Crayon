@@ -20,6 +20,7 @@ Children can inherit this behaviour, providing they call the init function.
 
 import re # TODO: remove
 from collections import OrderedDict
+from crayon.color import Rgb
 
 # =====================
 # ===== ERRORS ========
@@ -202,8 +203,21 @@ class Enum(Type):
     def _to_string(self, v):
         return v.upper()
 
-#TODO: represent colors as a proper type!
-Color = String
+class Color(Type):
+    def _from_py(self, v):
+        try:
+            return v.rgb
+        except AttributeError, e:
+            raise ValueError(e)
+
+    def _to_py(self, v):
+        return v
+
+    def _to_string(self, v):
+        return 'rgb: %r' % v.color
+
+    def _from_string(self, v):
+        return ast.literal_eval(v)
 
 # Numeric types
 
@@ -295,7 +309,7 @@ class Maybe(Type):
 
     def _to_string(self, v):
         if v is None:
-            return ''
+            return 'None'
         else:
             return self._proxy.to_string(v)
 
@@ -313,7 +327,6 @@ class Value(object):
         self._value = self._param.from_py(v)
         if hasattr(self, 'on_changed'):
             self.on_changed()
-
 
     @property
     def changed(self):
@@ -364,7 +377,6 @@ class Value(object):
 
 
     default = property(get_default, set_default, reset_default)
-
 
 def property_helper(key):
     def _getter(self):

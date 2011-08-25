@@ -4,12 +4,15 @@
 import gtk
 import cairo
 from crayon.latex import TexRunner
-from crayon.contexts.cairo import CairoCanvas
+from crayon.contexts.cairo import CairoCanvas, MM2PT
 import plots.layers as layers
 import time
+from crayon.color import Rgb
 
 # Sprinkling of magic...
 def refresh_gui(delay=0):
+    """An alternative to calling gtk.main(), that allows the gui to run
+    asynchronously"""
     while gtk.events_pending():
         gtk.main_iteration_do(block=False)
         time.sleep(delay)
@@ -99,3 +102,18 @@ def show():
         win = GraphWindow(tr, histo)
         win.show()
 
+def write_pdf(pdffile='outputs/pdfdump.pdf'):
+    w, h = histo.size
+    c = cairo.PDFSurface(pdffile, MM2PT * w, MM2PT * h)
+    context = cairo.Context(c)
+    context.scale(MM2PT, MM2PT)
+    histo.draw(CairoCanvas(context, tr, *histo.size).cursor())
+    c.finish()
+
+def write_svg(pdffile='outputs/pdfdump.svg'):
+    w, h = histo.size
+    c = cairo.SVGSurface(pdffile, MM2PT * w, MM2PT * h)
+    context = cairo.Context(c)
+    context.scale(MM2PT, MM2PT)
+    histo.draw(CairoCanvas(context, tr, *histo.size).cursor())
+    c.finish()

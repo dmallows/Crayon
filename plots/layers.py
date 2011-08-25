@@ -1,5 +1,6 @@
 from typesys import Int, String, Tuple, Color, Float, NameSpace, Maybe
 from crayon.spaces import LinSpace, LogSpace, Space2D
+from crayon.color import Rgb
 
 import math
 
@@ -69,11 +70,6 @@ class Layer(NameSpace):
 class LineStyle(NameSpace):
     width = Float()
     color = Color()
-    fill  = Maybe(Color())
-    def __init__(self, width = None, color = None):
-        super(type(self), self).__init__()
-        self['width'].default = width
-        self['color'].default = color
 
 class DataSet(NameSpace):
     linestyle = LineStyle()
@@ -81,20 +77,17 @@ class DataSet(NameSpace):
 
 class Plot(Layer):
     title  = String('')
-    linestyle = LineStyle()
     size   = Tuple(Int(default=80), Int(default=60))
-    border = LineStyle()
 
     def __init__(self, **kwargs):
         super(Plot, self).__init__()
-        for k, v in kwargs.iteritems():
-            print k,'=', v
+        self.lines = LineStyle()
+        self.border = LineStyle()
 
     def draw(self, c):
         c = c.set_plot(Space2D(self.x.space, self.y.space))
         for d in self._drawall:
             d.draw(c)
-
 
 # Methinks we can abstract yet more away!
 class TickLayer(Layer):
@@ -102,9 +95,11 @@ class TickLayer(Layer):
     major_length = Float(default=1.5)
     minor_length = Float(default=1.0)
     text_separation = Float(default=1.0)
+    textcolor = Color()
 
     def __init__(self, ticker):
         super(TickLayer, self).__init__()
+        self.lines = LineStyle()
         self.set_ticker(ticker)
 
     def set_ticker(self, ticker):
@@ -122,15 +117,16 @@ class HTicks(TickLayer):
         dmaj = self.major_length
         dmin = self.minor_length
         tback = self.text_separation + dmaj
+        style = dict(color=self.lines.color, width = self.lines.width)
 
         for x in self._ticker.minor:
-            top(x).to.paper.down(dmin).draw()
-            bottom(x).to.paper.up(dmin).draw()
+            top(x).to.paper.down(dmin).draw(**style)
+            bottom(x).to.paper.up(dmin).draw(**style)
 
         for x, label in self._ticker.major:
-            top(x).to.paper.down(dmaj).draw()
-            b = bottom(x).to.paper.up(dmaj).draw()
-            b.down(tback).text(label, anchor='north')
+            top(x).to.paper.down(dmaj).draw(**style)
+            b = bottom(x).to.paper.up(dmaj).draw(**style)
+            b.down(tback).text(label, anchor='north', color=self.textcolor)
 
         return self
 
@@ -144,19 +140,22 @@ class VTicks(TickLayer):
         dmaj = self.major_length
         dmin = self.minor_length
         tback = self.text_separation + dmaj
+        style = dict(color=self.lines.color, width = self.lines.width)
 
         for y in self._ticker.minor:
-            left(y).to.paper.right(dmin).draw()
-            right(y).to.paper.left(dmin).draw()
+            left(y).to.paper.right(dmin).draw(**style)
+            right(y).to.paper.left(dmin).draw(**style)
 
         for y, label in self._ticker.major:
-            right(y).to.paper.left(dmaj).draw()
-            l = left(y).to.paper.right(dmaj).draw()
-            l.left(tback).text(label, anchor='east')
+            right(y).to.paper.left(dmaj).draw(**style)
+            l = left(y).to.paper.right(dmaj).draw(**style)
+            l.left(tback).text(label, anchor='east', color=self.textcolor)
 
         return self
 
 class HistoData1D(DataSet):
+    def __init__(self):
+        self.lines = LineStyle()
 
     def set_data(self, data):
         self._data = data
@@ -173,10 +172,12 @@ class HistoData1D(DataSet):
 
         c = c.to.y(y0)
 
-        c.draw(color='red')
+        c.draw(color=self.lines.color, width=self.lines.width)
 
 class Frame(Layer):
-    linestyle = LineStyle()
+    def __init__(self):
+        self.lines = LineStyle()
+
     def draw(self, c):
         c.box(0,0).to(1,1).rect.draw()
 
@@ -203,8 +204,18 @@ class Histo1D(Plot):
 
         self.frame = Frame()
 
+        # Wire up default value inheritance
+        x.ticks.lines['color'].default = self.lines['color'].get
+        y.ticks.lines['color'].default = self.lines['color'].get
+        self.frame.lines['color'].default = self.lines['color'].get
+
+        x.ticks.lines['width'].default = self.lines['width'].get
+        y.ticks.lines['width'].default = self.lines['width'].get
+        self.frame.lines['width'].default = self.lines['width'].get
+
         self._drawall = [self.frame, self.x.ticks, self.y.ticks, self.data]
 
     def draw(self, c):
+        c.box(0, 1).paper.y(55).text("Hello World", rotation=90, anchor='northeast')
         c = c(10,5).to(75,55).zoom()
         super(Histo1D, self).draw(c)

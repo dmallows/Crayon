@@ -1,6 +1,7 @@
-from math import pi
+from math import pi, radians, sin, cos
 from crayon.spaces import Space2D, LinSpace, BoxSpace
 from crayon.point import Cursor
+from crayon.color import Rgb
 import rsvg
 
 # We really need to know exactly how wide each string will be, so that when it
@@ -14,9 +15,14 @@ TP2PT = 72.0 / 72.27
 PT2TP = 72.27 / 72.0
 
 anchors = dict(
-    north = (0.5, 0),
+    north = (0.5, 1),
     east = (1, 0.5),
-    middle = (0.5, 0.5))
+    middle = (0.5, 0.5),
+    south = (0.5, 0),
+    southeast = (1, 0),
+    west = (0, 0.5),
+    northwest = (0, 1),
+    northeast = (1, 1))
 
 class CairoCanvas(object):
     """Low-level stateful graphics context"""
@@ -56,16 +62,43 @@ class CairoCanvas(object):
         c = self.context
         c.arc(x, y, radius, 0, 2*pi)
 
-    def draw(self, **kw):
+    def draw(self, color=None, width=None):
+        self.context.save()
+        if color:
+            self.context.set_source_rgb(*color.rgb.color)
+        if width:
+            self.context.set_line_width(width)
         self.context.stroke()
+        self.context.restore()
 
-    def fill(self, **kw):
+    def fill(self, fillcolor=None, width=None):
+        self.context.save()
+        if fillcolor:
+            self.context.set_source_rgb(*fillcolor.rgb.color, width=None)
+        if width:
+            self.context.set_line_width(width)
         self.context.fill()
+        self.context.restore()
 
-    def filldraw(self, **kw):
-        self.context.fillstroke()
+    def filldraw(self, fillcolor=None, color=None, width=None):
+        self.context.save()
+        if fillcolor:
+            self.context.set_source_rgb(*fillcolor.rgb.color)
 
-    def text(self, pos, label, anchor='middle'):
+        self.context.fill_preserve()
+
+        self.context.restore()
+        self.context.save()
+
+        if width:
+            self.context.set_line_width(width)
+
+        if color:
+            self.context.set_source_rgb(*fillcolor.rgb.color)
+        self.context.draw()
+        self.context.restore()
+
+    def text(self, pos, label, anchor='middle', color=None, rotation=None):
         x,y = self.user_to_device(pos)
         anchor = anchors[anchor]
         texes = self._texrenderer.render([label])
@@ -82,11 +115,18 @@ class CairoCanvas(object):
 
         height = ymax - ymin
         width = xmax - xmin
-        c.translate(-xmin, -ymin)
-        dx, dy = anchor
+        sx, sy = anchor
 
-        c.set_line_width(0.05)
-        c.translate(-dx*width, -dy*height)
+        dx, dy = -sx*width-xmin, -(1.0 - sy)*height-ymin
+
+        if rotation:
+            angle = radians(-rotation)
+            sa, ca = sin(angle), cos(angle)
+            c.translate(ca*dx - sa*dy, sa*dx + ca*dy)
+            c.rotate(angle)
+        else:
+            c.translate(dx, dy)
+
         #c.rectangle(0, ymin, width, height)
         #c.stroke()
 
@@ -95,7 +135,8 @@ class CairoCanvas(object):
         #c.scale(90/96.0, 90/96.0)
         s.render_cairo(c)
         surface = c.pop_group()
-        c.set_source_rgb(0,0,0)
+        if color:
+            c.set_source_rgb(*color.rgb.color)
         c.mask(surface)
         c.restore()
         
