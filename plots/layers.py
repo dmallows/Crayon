@@ -99,12 +99,13 @@ class Plot(Layer):
 # Methinks we can abstract yet more away!
 class TickLayer(Layer):
 
+    major_length = Float(default=1.5)
+    minor_length = Float(default=1.0)
+    text_separation = Float(default=1.0)
+
     def __init__(self, ticker):
         super(TickLayer, self).__init__()
         self.set_ticker(ticker)
-        self.major_length = Float(default=3.0)
-        self.minor_length = Float(default=1.0)
-        self.text_separation = Float(default=1.0)
 
     def set_ticker(self, ticker):
         self._ticker = ticker
@@ -129,7 +130,7 @@ class HTicks(TickLayer):
         for x, label in self._ticker.major:
             top(x).to.paper.down(dmaj).draw()
             b = bottom(x).to.paper.up(dmaj).draw()
-            b.down(dmaj).text(label, anchor='north')
+            b.down(tback).text(label, anchor='north')
 
         return self
 
@@ -149,9 +150,9 @@ class VTicks(TickLayer):
             right(y).to.paper.left(dmin).draw()
 
         for y, label in self._ticker.major:
-            right(y).to.paper.left(self.major_length).draw()
-            l = left(y).to.paper.right(self.major_length).draw()
-            l.left(dmaj).text(label, anchor='east')
+            right(y).to.paper.left(dmaj).draw()
+            l = left(y).to.paper.right(dmaj).draw()
+            l.left(tback).text(label, anchor='east')
 
         return self
 

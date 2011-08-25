@@ -350,58 +350,58 @@ class Value(object):
 
     default = property(get_default, set_default, reset_default)
 
+
+def property_helper(key):
+    def _getter(self):
+        return self._params[key].get()
+
+    def _setter(self, value):
+        return self._params[key].set(value)
+
+    def _deller(self):
+        return self._params[key].clear()
+
+    return _getter, _setter, _deller
+
 class ModelMeta(type):
-    def __new__(cls, name, bases, attrs):
+    def __new__(cls, clsname, bases, attrs):
         params = [(name, attrs.pop(name)) for name, obj in attrs.items() if
                   isinstance(obj, Type)]
-        attrs['_params'] = params
-        new_class = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
-        return new_class
+        params.sort(key=lambda x: x[1]._counter)
 
+        for base in reversed(bases):
+            if hasattr(base, '_params'):
+                params = base._params.items() + params
+
+        attrs['_params'] = params = OrderedDict(params)
+        
+        properties = {}
+
+        for x, v in params.iteritems():
+            print x, v
+            p = property(*property_helper(x))
+            attrs[x] = p
+            properties[x] = p
+
+        attrs['_properties'] = properties 
+        new_class = super(ModelMeta, cls).__new__(cls, clsname, bases, attrs)
+        return new_class
 
 class NameSpace(object):
     __metaclass__ = ModelMeta
 
-    def __init__(self):
-        super(NameSpace, self).__init__()
-        params = self._params
-        self._params = OrderedDict()
-        self._all = OrderedDict()
+    def __new__(cls, *args, **kwargs):
+        params = cls._params.copy()
 
-        for name, param in params:
-            setattr(self, name, param)
+        for key in params:
+            params[key] = Value(params[key])
 
-        self._namespaces = OrderedDict()
+        self = super(NameSpace, cls).__new__(cls, *args, **kwargs)
+        self._params = params
+        return self
 
-    def __setattr__(self, name, obj):
-        if isinstance(obj, Type):
-            value = Value(obj)
-            self._params[name] = value
-            self._all[name] = value
-            #super(NameSpace, self).__setattr__(name, Proxy(value))
-
-        elif isinstance(obj, NameSpace):
-            self._namespaces[name] = obj
-            self._all[name] = obj
-            super(NameSpace, self).__setattr__(name, obj)
-
-        elif name in self._params:
-            self._params[name].value = obj
-
-        else:
-            super(NameSpace, self).__setattr__(name, obj)
-
-    def __getattr__(self, name):
-        try:
-            return self._params[name].value
-        except KeyError:
-            return getattr(super(NameSpace, self), name)
-
-    def __delattr__(self, name):
-        try:
-            del self._params[name].value
-        except:
-            raise
+    def __init__(self, *args, **kwargs):
+        return
 
     def __getitem__(self, name):
         try:
@@ -419,6 +419,3 @@ class NameSpace(object):
                 return self[name[0]][name[1:]]
             except TypeError:
                 return self[name[0]]
-
-    def __setitem__(self, name, value):
-        self._params[name] = value

@@ -28,7 +28,7 @@ class CairoCanvas(object):
         self.context = context
         self._textcache = set()
         self._texrenderer = texrenderer
-        context.scale(MM2TP, MM2TP)
+        #context.scale(MM2TP, MM2TP)
         context.set_line_width(0.2)
         context.set_line_cap(1)
         context.set_line_join(1)
@@ -68,7 +68,7 @@ class CairoCanvas(object):
     def text(self, pos, label, anchor='middle'):
         x,y = self.user_to_device(pos)
         anchor = anchors[anchor]
-        texes = self._texrenderer.render([label], force=True)
+        texes = self._texrenderer.render([label])
         tex, = self._texrenderer.to_svg(texes)
         s = TP2MM
         c = self.context
@@ -76,7 +76,9 @@ class CairoCanvas(object):
         c.translate(x,y)
         c.push_group()
         c.scale(s,s)
-        y0, ymin, xmin, ymax, xmax, yn = tex.extents
+        # I'm not sure if this *is* needed
+        y0, ymin, xmin, ymax, xmax, yn = [PT2TP * i for i in tex.extents]
+
 
         height = ymax - ymin
         width = xmax - xmin
@@ -84,16 +86,17 @@ class CairoCanvas(object):
         c.translate(-xmin, -ymin)
         dx, dy = anchor
 
-        c.set_line_width(0.01)
+        c.set_line_width(0.05)
         c.translate(-dx*width, -dy*height)
-        c.rectangle(0, ymin, width,height)
-        c.stroke()
+        #c.rectangle(0, ymin, width, height)
+        #c.stroke()
 
         s = rsvg.Handle(file=tex.svgfile)
-        c.scale(PT2TP, PT2TP)
+        #c.scale(PT2TP, PT2TP)
+        #c.scale(90/96.0, 90/96.0)
         s.render_cairo(c)
         surface = c.pop_group()
-        c.set_source_rgb(1,0,0)
+        c.set_source_rgb(0,0,0)
         c.mask(surface)
         c.restore()
         

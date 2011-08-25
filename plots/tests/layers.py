@@ -30,13 +30,14 @@ class TestHisto(unittest.TestCase):
         self.histo = layers.Histo1D(title='My Pretty Plot')
 
     def test_something(self):
-        with closing(TexRunner()) as tr:
-            c = cairo.PDFSurface('outputs/cairo-out.pdf', *map(cc.mm_to_pspt, (80,60)))
-            
-            canvas = cc.CairoCanvas(cairo.Context(c), tr, 80, 60)
-            
-            self.histo.draw(canvas.cursor())
-            c.finish()
+        tr = TexRunner()
+        c = cairo.PDFSurface('outputs/cairo-out.pdf',
+                             *(cc.MM2PT*x for x in (80,60)))
+        
+        canvas = cc.CairoCanvas(cairo.Context(c), tr, 80, 60)
+        
+        self.histo.draw(canvas.cursor())
+        c.finish()
 
 if __name__=='__main__':
     unittest.main()
