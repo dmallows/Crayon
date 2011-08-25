@@ -149,7 +149,7 @@ class VTicks(TickLayer):
         for y, label in self._ticker.major:
             right(y).to.paper.left(dmaj).draw(**style)
             l = left(y).to.paper.right(dmaj).draw(**style)
-            l.left(tback).text(label, anchor='east', color=self.textcolor)
+            l.left(tback).text(label, anchor='middle', color=self.textcolor)
 
         return self
 
@@ -162,15 +162,12 @@ class HistoData1D(DataSet):
         return self
 
     def draw(self, c):
-        _, y0 = c.box(0,0).plot.pos
-        x, _, _ = self._data[0]
+        x, w, y = self._data[0]
 
-        c = c.plot(x,y0)
+        c = c.plot(x,y).to(x+w, y)
 
         for x, w, y in self._data:
-            c = c.to(x,y).to(x+w, y)
-
-        c = c.to.y(y0)
+            c = c.to(x, y).to(x+w, y)
 
         c.draw(color=self.lines.color, width=self.lines.width)
 
@@ -179,7 +176,8 @@ class Frame(Layer):
         self.lines = LineStyle()
 
     def draw(self, c):
-        c.box(0,0).to(1,1).rect.draw()
+        c.box(0,0).to(1,1).rect.draw(color=self.lines.color,
+                                     width=self.lines.width)
 
 class Histo1D(Plot):
     x = NameSpace()
@@ -194,7 +192,7 @@ class Histo1D(Plot):
         x.space = LinSpace(0, 100)
         y.space = LogSpace(0.001, 1000)
 
-        x.ticker = LinTicker(x.space, 20, 1)
+        x.ticker = LinTicker(x.space, 10, 1)
         x.ticks = HTicks(x.ticker)
 
         y.ticker = LogTicker(y.space)
@@ -205,15 +203,12 @@ class Histo1D(Plot):
         self.frame = Frame()
 
         # Wire up default value inheritance
-        x.ticks.lines['color'].default = self.lines['color'].get
-        y.ticks.lines['color'].default = self.lines['color'].get
-        self.frame.lines['color'].default = self.lines['color'].get
+        x.ticks.lines.follow(self.lines)
+        y.ticks.lines.follow(self.lines)
+        self.frame.lines.follow(self.lines)
 
-        x.ticks.lines['width'].default = self.lines['width'].get
-        y.ticks.lines['width'].default = self.lines['width'].get
-        self.frame.lines['width'].default = self.lines['width'].get
 
-        self._drawall = [self.frame, self.x.ticks, self.y.ticks, self.data]
+        self._drawall = [self.data, self.x.ticks, self.y.ticks, self.frame]
 
     def draw(self, c):
         c.box(0, 1).paper.y(55).text("Hello World", rotation=90, anchor='northeast')

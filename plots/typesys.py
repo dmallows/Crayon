@@ -414,8 +414,16 @@ class ModelMeta(type):
         new_class = super(ModelMeta, cls).__new__(cls, clsname, bases, attrs)
         return new_class
 
+class Proxy(object):
+    def __init__(self, param):
+        self._param = param
+
+    def __call__(self):
+        return self._param.get()
+
 class NameSpace(object):
     __metaclass__ = ModelMeta
+
 
     def __new__(cls, *args, **kwargs):
         params = cls._params.copy()
@@ -465,3 +473,15 @@ class NameSpace(object):
             i.fmap(f)
         for p in self.params().values():
             f(p)
+
+    def follow(self, f):
+        """Recursively inherit defaults from given namespace"""
+        for k, v in f.params().iteritems():
+            try:
+                self._params[k].default = Proxy(v)
+            except KeyError:
+                pass
+
+    def iteritems(self):
+        return ((k, v.value) for k, v in self.params().iteritems())
+

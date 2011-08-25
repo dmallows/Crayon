@@ -1,18 +1,28 @@
-import crayon.latex as tex
+import crayon.latex as latex
 import contextlib
 import unittest
+import shutil
+import os
 
 class TestTexRunner(unittest.TestCase):
     def setUp(self):
-        self.tex = tex.TexRunner()
+        pass
+
 
     def test_svgs(self):
-        texes = self.tex.render(['%05d' % i for i in xrange(1000)])
-        print 'Done Tex'
-        self.tex.to_svg(texes)
+        tex = latex.TexRunner()
+        texes = tex.render(['%04d' % i for i in xrange(1010)])
+        # print texes
+        texes = tex.to_svg(texes)
+        for t in texes:
+            print t.svgfile
+
+        tex.close()
 
     def tearDown(self):
-        self.tex.close()
+        #self.tex.close()
+        #shutil.rmtree(os.path.expanduser('~/.cache/crayon'))
+        pass
 
 if __name__ == '__main__':
-    self.unittest.main()
+    unittest.main()

@@ -173,6 +173,7 @@ class TexRunner(object):
         #filter for any that do not exist in svgcache...
         svgnames = [self._cache(tex.hash + '.svg') for tex in texes]
 
+        
         # Populate svgfiles with names for those that are known
         for svgfile, tex in zip(svgnames, texes):
             if os.path.isfile(svgfile):
@@ -184,9 +185,13 @@ class TexRunner(object):
 
         # filter
 
-        groups = itertools.groupby(unmade, lambda self: self.dvifile)
+        groups = itertools.groupby(unmade, lambda s: s.dvifile)
 
         for group, xs in groups:
+            # Unbelievable subtle bug... we were exhausting the iterator.
+            # Lesson: test test test test test!
+            xs = list(xs)
+
             if group is None:
                 xs = self.render((x.text for x in xs), force=True)
                 group = xs[0].dvifile
