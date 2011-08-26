@@ -220,6 +220,13 @@ class Cursor(object):
             self._gc.filldraw(*a, **kw)
             return self._clear_path()
 
+    def make_strings(self, strings):
+        return self._gc.make_strings(strings)
+
+    def make_svgs(self):
+        self._gc.make_svgs()
+        return self
+
     def text(self, label, **kwargs):
         """Place text at cursor location, using anchor if given"""
         self._gc.text(self, label, **kwargs)
@@ -245,6 +252,7 @@ class Cursor(object):
     def _clear_path(self):
         """Clear the currently stored path"""
         return self._set(path = ())
+
 
     @property
     def rect(self):

@@ -20,6 +20,7 @@ anchors = dict(
     middle = (0.5, 0.5),
     south = (0.5, 0),
     southeast = (1, 0),
+    southwest = (0, 0),
     west = (0, 0.5),
     northwest = (0, 1),
     northeast = (1, 1))
@@ -130,16 +131,24 @@ class CairoCanvas(object):
         #c.rectangle(0, ymin, width, height)
         #c.stroke()
 
-        s = rsvg.Handle(file=tex.svgfile)
         #c.scale(PT2TP, PT2TP)
         #c.scale(90/96.0, 90/96.0)
-        s.render_cairo(c)
+        tex.svg.render_cairo(c)
         surface = c.pop_group()
         if color:
             c.set_source_rgb(*color.rgb.color)
         c.mask(surface)
         c.restore()
-        
-    def make_text(self):
-        self.texrenderer.to_svg(texes)
 
+    def make_strings(self, strings):
+        self._texes = self._texrenderer.render(strings)
+        for t in self._texes:
+            y0, ymin, xmin, ymax, xmax, y1 = t.extents
+            t.size = TP2MM * (xmax - xmin), TP2MM * (ymax - ymin)
+        return self._texes
+
+    def make_svgs(self):
+        texes = self._texrenderer.to_svg(self._texes)
+        for tex in texes:
+            if not hasattr(tex, 'svg'):
+                tex.svg = rsvg.Handle(file=tex.svgfile)

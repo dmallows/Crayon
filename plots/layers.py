@@ -65,7 +65,20 @@ class Layer(NameSpace):
         super(Layer, self).__init__()
 
     def draw(self, c):
-        pass
+        self._draw(self._pre_draw(c))
+
+    def _pre_draw(self,c):
+        return c
+
+    def _draw(self,c):
+        return c
+
+    def get_text(self):
+        return self._get_text(TextContext())._strings
+
+    def _get_text(self, c):
+        self._draw(c)
+        return c
 
 class LineStyle(NameSpace):
     width = Float()
@@ -77,17 +90,22 @@ class DataSet(NameSpace):
 
 class Plot(Layer):
     title  = String('')
-    size   = Tuple(Int(default=80), Int(default=60))
+    size   = Tuple(Float(default=80), Float(default=60))
+    margin = Float(default=2)
+    text_separation = Float(default=2)
 
     def __init__(self, **kwargs):
         super(Plot, self).__init__()
         self.lines = LineStyle()
         self.border = LineStyle()
 
-    def draw(self, c):
-        c = c.set_plot(Space2D(self.x.space, self.y.space))
+    def _pre_draw(self, c):
+        return c.set_plot(Space2D(self.x.space, self.y.space))
+
+    def _draw(self, c):
         for d in self._drawall:
             d.draw(c)
+        return c
 
 # Methinks we can abstract yet more away!
 class TickLayer(Layer):
@@ -110,7 +128,7 @@ class TickLayer(Layer):
 class HTicks(TickLayer):
 
 
-    def draw(self, c):
+    def _draw(self, c):
         top = c.box(0,1).plot.x
         bottom = c.box(0,0).plot.x
 
@@ -133,7 +151,7 @@ class HTicks(TickLayer):
 
 class VTicks(TickLayer):
 
-    def draw(self, c):
+    def _draw(self, c):
         left = c.box(0,0).plot.y
         right = c.box(1,0).plot.y
 
@@ -149,7 +167,7 @@ class VTicks(TickLayer):
         for y, label in self._ticker.major:
             right(y).to.paper.left(dmaj).draw(**style)
             l = left(y).to.paper.right(dmaj).draw(**style)
-            l.left(tback).text(label, anchor='middle', color=self.textcolor)
+            l.left(tback).text(label, anchor='east', color=self.textcolor)
 
         return self
 
@@ -160,6 +178,7 @@ class HistoData1D(DataSet):
     def set_data(self, data):
         self._data = data
         return self
+
 
     def draw(self, c):
         x, w, y = self._data[0]
@@ -179,9 +198,29 @@ class Frame(Layer):
         c.box(0,0).to(1,1).rect.draw(color=self.lines.color,
                                      width=self.lines.width)
 
+class TextContext(object):
+    def __init__(self):
+        self._strings = []
+    def text(self, label, **kwargs):
+        self._strings.append(label)
+    def __getattr__(self, a):
+        return self
+    def __call__(self, *args, **kwargs):
+        return self
+
+# quick and dirty hack
+def combine_sizes(texes):
+    return reduce(lambda (max_x, max_y), (x, y):
+                  (max(max_x, x), max(max_y, y)),
+                  (t.size for t in texes))
+
+class Axis(NameSpace):
+    label = String('')
+    text_separation = Float(default=2.0)
+
 class Histo1D(Plot):
-    x = NameSpace()
-    y = NameSpace()
+    x = Axis()
+    y = Axis()
 
     def __init__(self, **kwargs):
         # We have to get kwargs out...
@@ -210,7 +249,51 @@ class Histo1D(Plot):
 
         self._drawall = [self.data, self.x.ticks, self.y.ticks, self.frame]
 
-    def draw(self, c):
-        c.box(0, 1).paper.y(55).text("Hello World", rotation=90, anchor='northeast')
-        c = c(10,5).to(75,55).zoom()
-        super(Histo1D, self).draw(c)
+    def _pre_draw(self, c):
+        strings = self.get_text()
+        texes = c.make_strings(strings)
+        c.make_svgs()
+        m = self.margin
+        c = c(m,m).to.box(1,1).paper.move(-m, -m).zoom()
+
+        ystrings = c.make_strings(self.y.ticks.get_text())
+        left,_ = combine_sizes(ystrings)
+        left += self.y.ticks.text_separation
+
+        xstrings = c.make_strings(self.x.ticks.get_text())
+        _,bottom = combine_sizes(xstrings)
+        bottom += self.x.ticks.text_separation
+
+        right = c.box(1,1).paper.left(0.5*xstrings[-1].size[0]).pos[0]
+        top =   c.box(1,1).paper.down(0.5*ystrings[-1].size[1]).pos[1]
+
+        x_label, y_label = c.make_strings((self.x.label, self.y.label))
+        c.make_svgs()
+
+        if self.y.label:
+            left += y_label.size[1] + self.y.text_separation
+
+        if self.x.label:
+            bottom += x_label.size[1] + self.x.text_separation
+
+        c.paper(right, 0).text(self.x.label, anchor='southeast')
+        c.paper(0, top).text(self.y.label, anchor='northeast', rotation=90)
+
+        
+        c = c.paper(left, bottom).to(right, top).zoom()
+
+        if self.title:
+            title_string = r'\parbox{%f mm}{%s}' % (
+                 right - left, self.title)
+            title, = c.make_strings((title_string,))
+            _, h = title.size
+            c.make_svgs()
+            c = c.box(0, 0).to(1,1).paper.down(h+self.text_separation).zoom()
+            c.box(0.5,1).paper.up(self.text_separation).text(title_string, anchor='south')
+
+
+        return super(Histo1D, self)._pre_draw(c)
+
+    def _draw(self, c):
+        super(Histo1D, self)._draw(c)
+
