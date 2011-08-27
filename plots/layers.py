@@ -21,7 +21,7 @@ class LinTicker(object):
         self.minor = self._calc_minor(major, minor)
 
     def _to_str(self, x):
-        return '%g' % x
+        return '$%g$' % x
 
     def _calc_major(self, dx):
         """Major ticks"""
@@ -179,16 +179,17 @@ class HistoData1D(DataSet):
         self._data = data
         return self
 
-
     def draw(self, c):
-        x, w, y = self._data[0]
+        c = c.box(0,0).to(1,1).rect.clip
+        x1, x2, y = self._data[0]
 
-        c = c.plot(x,y).to(x+w, y)
+        c = c.plot(x1,y).to(x2, y)
 
-        for x, w, y in self._data:
-            c = c.to(x, y).to(x+w, y)
+        for x1, x2, y in self._data[1:]:
+            c = c.to(x1, y).to(x2, y)
 
         c.draw(color=self.lines.color, width=self.lines.width)
+        c.reset_clip
 
 class Frame(Layer):
     def __init__(self):
@@ -228,16 +229,20 @@ class Histo1D(Plot):
 
         x, y = self.x, self.y
 
-        x.space = LinSpace(0, 100)
-        y.space = LogSpace(0.001, 1000)
+        x.space = LinSpace(30, 180)
+        y.space = LogSpace(10, 1000)
 
-        x.ticker = LinTicker(x.space, 10, 1)
+        x.ticker = LinTicker(x.space, 50, 10)
         x.ticks = HTicks(x.ticker)
 
         y.ticker = LogTicker(y.space)
         y.ticks = VTicks(y.ticker)
 
-        self.data = HistoData1D().set_data([(0,50,1),(50,50,10)])
+        import numpy
+        data = numpy.loadtxt('test.dat')[:,:3]
+        self.data = HistoData1D().set_data(data)
+
+        self.data.lines['color'].default = Rgb(0.8,0.2,0.2)
 
         self.frame = Frame()
 
@@ -276,20 +281,25 @@ class Histo1D(Plot):
         if self.x.label:
             bottom += x_label.size[1] + self.x.text_separation
 
-        c.paper(right, 0).text(self.x.label, anchor='southeast')
-        c.paper(0, top).text(self.y.label, anchor='northeast', rotation=90)
-
-        
-        c = c.paper(left, bottom).to(right, top).zoom()
-
         if self.title:
             title_string = r'\parbox{%f mm}{%s}' % (
                  right - left, self.title)
-            title, = c.make_strings((title_string,))
-            _, h = title.size
-            c.make_svgs()
-            c = c.box(0, 0).to(1,1).paper.down(h+self.text_separation).zoom()
-            c.box(0.5,1).paper.up(self.text_separation).text(title_string, anchor='south')
+        else:
+            title_string = ''
+
+        title, = c.make_strings((title_string,))
+        c.make_svgs()
+
+        if self.title:
+            top -= (title.size[1] + self.text_separation)
+
+
+        c.paper(right, 0).text(self.x.label, anchor='southeast')
+        c.paper(0, top).text(self.y.label, anchor='northeast', rotation=90)
+        
+        c = c.paper(left, bottom).to(right, top).zoom()
+        c.box(0,1).paper.up(self.text_separation).text(title_string,
+                                                       anchor='southwest')
 
 
         return super(Histo1D, self)._pre_draw(c)

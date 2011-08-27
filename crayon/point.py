@@ -131,6 +131,7 @@ class Cursor(object):
             return sqrt(dx*dx + dy*dy)
         else:
             return self.paper.distance_from(other)
+
         
     def zoom(self):
         """Zoom into the rectangle with diagonal defined by shortest
@@ -174,6 +175,16 @@ class Cursor(object):
         """Clear current plot space."""
         spaces = self._spaces.copy()
         del spaces['plot']
+
+    @property
+    def clip(self):
+        self._gc.context.save()
+        self._gc.context.clip()
+        return self
+
+    @property
+    def reset_clip(self):
+        self._gc.context.restore()
 
     @property
     def end(self):
