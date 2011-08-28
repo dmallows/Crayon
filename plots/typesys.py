@@ -405,7 +405,6 @@ class ModelMeta(type):
         properties = {}
 
         for x, v in params.iteritems():
-            print x, v
             p = property(*property_helper(x))
             attrs[x] = p
             properties[x] = p

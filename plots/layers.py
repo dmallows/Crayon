@@ -8,47 +8,44 @@ ceil = lambda x : int(math.ceil(x))
 floor = lambda x: int(math.floor(x))
 log = math.log
 
-class LinTicker(object):
+class LinTicker(NameSpace):
     """A ticker for linear axes"""
-    def __init__(self, space, major, minor):
-        major = float(major)
-        minor = float(minor)
+    min = Float()
+    max = Float()
+    major_frequency = Float()
 
-        self._space = space
-        self._range = (space.from_box(0), space.from_box(1))
+    @property
+    def major(self):
+        a, b = self.min, self.max
+        dx = self.major_frequency
+        ticks = (i*dx for i in xrange(ceil(a / dx), int(1 + b/dx)) )
+        return tuple((i, self._to_str(i)) for i in ticks)
 
-        self.major = self._calc_major(major)
-        self.minor = self._calc_minor(major, minor)
+    @property
+    def minor(self):
+        return ()
 
     def _to_str(self, x):
         return '$%g$' % x
 
-    def _calc_major(self, dx):
-        """Major ticks"""
-        a, b = self._range
-        ticks = (i*dx for i in xrange(ceil(a / dx), int(1 + b/dx)) )
-        return tuple((i, self._to_str(i)) for i in ticks)
-
-    def _calc_minor(self, dx, dxm):
-        """Minor ticks"""
-        a, b = self._range
-        ticks = (i*dxm for i in xrange(ceil(a / dxm), int(1 + b/dxm)) )
-        return tuple(i for i in ticks if i not in self.major)
-
-class LogTicker(object):
-    def __init__(self, space):
-        self._space = space
-        self._range = (space.from_box(0), space.from_box(1))
-
-        self.major = self._calc_major()
-        self.minor = self._calc_minor()
-
+class LogTicker(NameSpace):
     def _to_str(self, x):
         return '$10^{%d}$' % x
 
+    min = Float()
+    max = Float()
+
+    @property
+    def major(self):
+        return self._calc_major()
+
+    @property
+    def minor(self):
+        return self._calc_minor()
+        
     def _calc_major(self):
         """Major ticks"""
-        a, b = self._range
+        a, b = self.min, self.max
         eps = 0.0001
         a, b = ceil(log(a,10) - eps), floor(log(b,10) + eps)
         a, b = sorted((a,b))
@@ -109,7 +106,6 @@ class Plot(Layer):
 
 # Methinks we can abstract yet more away!
 class TickLayer(Layer):
-
     major_length = Float(default=1.5)
     minor_length = Float(default=1.0)
     text_separation = Float(default=1.0)
@@ -126,8 +122,6 @@ class TickLayer(Layer):
 
 
 class HTicks(TickLayer):
-
-
     def _draw(self, c):
         top = c.box(0,1).plot.x
         bottom = c.box(0,0).plot.x
@@ -218,6 +212,8 @@ def combine_sizes(texes):
 class Axis(NameSpace):
     label = String('')
     text_separation = Float(default=2.0)
+    min = Float()
+    max = Float()
 
 class Histo1D(Plot):
     x = Axis()
@@ -229,13 +225,23 @@ class Histo1D(Plot):
 
         x, y = self.x, self.y
 
-        x.space = LinSpace(30, 180)
-        y.space = LogSpace(10, 1000)
+        x.spacetype = LinSpace
+        y.spacetype = LogSpace
 
-        x.ticker = LinTicker(x.space, 50, 10)
+        x.min = 30
+        x.max = 180
+        y.min = 10
+        y.max = 1000
+
+        x.ticker = LinTicker()
+        x.ticker.min = 30
+        x.ticker.max = 180 
+        x.ticker.major_frequency = 50 
         x.ticks = HTicks(x.ticker)
 
-        y.ticker = LogTicker(y.space)
+        y.ticker = LogTicker()
+        y.ticker.min = 10
+        y.ticker.max = 1000
         y.ticks = VTicks(y.ticker)
 
         import numpy
@@ -255,6 +261,11 @@ class Histo1D(Plot):
         self._drawall = [self.data, self.x.ticks, self.y.ticks, self.frame]
 
     def _pre_draw(self, c):
+        x = self.x
+        y = self.y
+        x.space = x.spacetype(x.min, x.max)
+        y.space = y.spacetype(y.min, y.max)
+
         strings = self.get_text()
         texes = c.make_strings(strings)
         c.make_svgs()
