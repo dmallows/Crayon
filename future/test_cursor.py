@@ -5,7 +5,6 @@ import cPickle
 class TestAngle(unittest.TestCase):
     pass
 
-
 class TestCursor(unittest.TestCase):
     def test_move(self):
         """Check that we can draw a 10 x 10 square and return at our
@@ -47,7 +46,16 @@ class TestCursor(unittest.TestCase):
         c = Cursor(0,0).to.NW(10).angle
         print c
 
+
+    def test_bearing(self):
+        c = Cursor(0,0)
+        self.assertEqual(0, c(0,0).to.N(10).angle)
+        self.assertEqual(90, c(0,0).to.E(10).angle)
+        self.assertEqual(180, c(0,0).S(10).angle)
+        self.assertEqual(270, c(0,0).to.W(10).angle)
         
+        for x in (11.8, 279.15, 87.3, 100.2):
+            self.assertAlmostEqual(x, c(0,0).head(x).angle)
 
 if __name__=='__main__':
     unittest.main()

@@ -10,16 +10,18 @@ log = math.log
 
 class LinTicker(NameSpace):
     """A ticker for linear axes"""
-    min = Float()
-    max = Float()
+    range = Tuple(Float(), Float())
     major_frequency = Float()
 
     @property
     def major(self):
-        a, b = self.min, self.max
-        dx = self.major_frequency
-        ticks = (i*dx for i in xrange(ceil(a / dx), int(1 + b/dx)) )
-        return tuple((i, self._to_str(i)) for i in ticks)
+        try:
+            a, b = self.range
+            dx = self.major_frequency
+            ticks = (i*dx for i in xrange(ceil(a / dx), int(1 + b/dx)) )
+            return tuple((i, self._to_str(i)) for i in ticks)
+        except Exception:
+            return []
 
     @property
     def minor(self):
@@ -29,11 +31,10 @@ class LinTicker(NameSpace):
         return '$%g$' % x
 
 class LogTicker(NameSpace):
+    range = Tuple(Float(), Float())
+
     def _to_str(self, x):
         return '$10^{%d}$' % x
-
-    min = Float()
-    max = Float()
 
     @property
     def major(self):
@@ -45,7 +46,7 @@ class LogTicker(NameSpace):
         
     def _calc_major(self):
         """Major ticks"""
-        a, b = self.min, self.max
+        a, b = self.range
         eps = 0.0001
         a, b = ceil(log(a,10) - eps), floor(log(b,10) + eps)
         a, b = sorted((a,b))
@@ -212,8 +213,7 @@ def combine_sizes(texes):
 class Axis(NameSpace):
     label = String('')
     text_separation = Float(default=2.0)
-    min = Float()
-    max = Float()
+    range = Tuple(Float(), Float())
 
 class Histo1D(Plot):
     x = Axis()
@@ -228,20 +228,16 @@ class Histo1D(Plot):
         x.spacetype = LinSpace
         y.spacetype = LogSpace
 
-        x.min = 30
-        x.max = 180
-        y.min = 10
-        y.max = 1000
+        x.range = 30, 180
+        y.range = 10, 1000
 
         x.ticker = LinTicker()
-        x.ticker.min = 30
-        x.ticker.max = 180 
+        x.ticker['range'].default = x.range
         x.ticker.major_frequency = 50 
         x.ticks = HTicks(x.ticker)
 
         y.ticker = LogTicker()
-        y.ticker.min = 10
-        y.ticker.max = 1000
+        y.ticker['range'].default = y.range
         y.ticks = VTicks(y.ticker)
 
         import numpy
@@ -263,8 +259,8 @@ class Histo1D(Plot):
     def _pre_draw(self, c):
         x = self.x
         y = self.y
-        x.space = x.spacetype(x.min, x.max)
-        y.space = y.spacetype(y.min, y.max)
+        x.space = x.spacetype(*x.range)
+        y.space = y.spacetype(*y.range)
 
         strings = self.get_text()
         texes = c.make_strings(strings)
