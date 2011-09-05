@@ -130,5 +130,9 @@ class TestCursor(unittest.TestCase):
         self.assertAlmostEquals(x, 100)
         self.assertAlmostEquals(y, 100)
 
+    def test_paths(self):
+        c = self.c
+        c(0,0).to(1,0).to(1,1).to(1,0).curve
+
 if __name__=='__main__':
     unittest.main()

@@ -60,6 +60,10 @@ class ChangeView(object):
     def __repr__(self):
         return "ChangeView(%r)" % self._spacename
 
+class Proxy(object):
+    def __init__(self, target):
+        print target
+
 class Cursor(object):
     # BEGIN Magic
     # These are class members that represent a deferred relative motion.
@@ -79,8 +83,9 @@ class Cursor(object):
     box = ChangeView('box')
     paper = ChangeView('paper')
     absolute = ChangeView('absolute')
-    # END Magic 
 
+    # END Magic 
+    
     def __init__(self, context, spaces, current, pos = (0,0), path=None):
         self.pos = pos
         self._context = context
@@ -224,6 +229,35 @@ class Cursor(object):
         
         self._spaces[name] = newSpace
 
+    @property
+    def clear_path(self):
+        self._path = []
+    
+    @property
+    def end(self):
+        self._context.push_path(path.append(self))
+        return self
+    
+    @property
+    def cycle(self):
+        return self
+
+    def draw(self, color=None, width=None, clear=True):
+        """Draw the outline of a path. If clear is set to False, do not clear
+        the path after drawing it."""
+        self._context.draw(color, width)
+        if clear:
+            self.clear_path()
+
+    def filldraw(self, color=None, fill=None, width=None, clear=True):
+        """Fill and draw a path."""
+        self.fill(color=fill, clear=False)
+        self.draw(color=color, width=None, clear=clear)
+
+    def fill(self, fill=None, clear=True):
+        """Fill the currently stored path."""
+        self.fill(color=fill, clear=False)
+        self.draw(color=color, width=None, clear=clear)
 
     def __repr__(self):
         return '<%s%r>' % (self.__class__.__name__, (self._x, self._y))
