@@ -79,7 +79,7 @@ class GraphWindow(gtk.Window):
         else:
             raise RuntimeError('Window has been closed by user')
 
-histo = layers.Histo1D(title='My Pretty Plot')
+histo = layers.Scatter2D(title='My Pretty Plot')
 tr = TexRunner()
 win = GraphWindow(tr, histo)
 

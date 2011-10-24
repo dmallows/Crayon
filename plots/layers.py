@@ -114,6 +114,7 @@ class TickLayer(Layer):
 
     def __init__(self, ticker):
         super(TickLayer, self).__init__()
+
         self.lines = LineStyle()
         self.set_ticker(ticker)
 
@@ -166,25 +167,6 @@ class VTicks(TickLayer):
 
         return self
 
-class HistoData1D(DataSet):
-    def __init__(self):
-        self.lines = LineStyle()
-
-    def set_data(self, data):
-        self._data = data
-        return self
-
-    def draw(self, c):
-        c = c.box(0,0).to(1,1).rect.clip
-        x1, x2, y = self._data[0]
-
-        c = c.plot(x1,y).to(x2, y)
-
-        for x1, x2, y in self._data[1:]:
-            c = c.to(x1, y).to(x2, y)
-
-        c.draw(color=self.lines.color, width=self.lines.width)
-        c.reset_clip
 
 class Frame(Layer):
     def __init__(self):
@@ -214,6 +196,125 @@ class Axis(NameSpace):
     label = String('')
     text_separation = Float(default=2.0)
     range = Tuple(Float(), Float())
+
+class ScatterData2D(DataSet):
+    def __init__(self):
+        self.lines = LineStyle()
+
+    def set_data(self, data):
+        self._data = data
+        return self
+
+    def draw(self, c):
+        c = c.box(0,0).to(1,1).rect.clip
+        x, y = self._data[0]
+
+        c = c.plot(x,y)
+
+        for x, y in self._data[1:]:
+            c = c.to(x, y)
+
+        c.draw(color=self.lines.color, width=self.lines.width)
+        c.reset_clip
+
+class Scatter2D(Plot):
+    x = Axis()
+    y = Axis()
+
+    def __init__(self, **kwargs):
+        # We have to get kwargs out...
+        super(Scatter2D, self).__init__(**kwargs)
+
+        x, y = self.x, self.y
+
+        x.spacetype = LinSpace
+        y.spacetype = LinSpace
+
+        x.range = 0, 2*math.pi
+        y.range = -1, 1
+
+        x.ticker = LinTicker()
+        x.ticker['range'].default = x.range
+        x.ticker.major_frequency = 0.5
+        x.ticks = HTicks(x.ticker)
+
+        y.ticker = LinTicker()
+        y.ticker['range'].default = y.range
+        y.ticker.major_frequency = 0.5
+        y.ticks = VTicks(y.ticker)
+
+        data = [(_*0.01*math.pi, math.sin(_*0.01*math.pi)) for _ in xrange(201)]
+        self.data = ScatterData2D().set_data(data)
+
+        self.data.lines['color'].default = Rgb(0.8,0.2,0.2)
+
+        self.frame = Frame()
+
+        # Wire up default value inheritance
+        x.ticks.lines.follow(self.lines)
+        y.ticks.lines.follow(self.lines)
+        self.frame.lines.follow(self.lines)
+
+
+        self._drawall = [self.data, self.x.ticks, self.y.ticks, self.frame]
+
+    def _pre_draw(self, c):
+        x = self.x
+        y = self.y
+        x.space = x.spacetype(*x.range)
+        y.space = y.spacetype(*y.range)
+
+        strings = self.get_text()
+        texes = c.make_strings(strings)
+        c.make_svgs()
+        m = self.margin
+        c = c(m,m).to.box(1,1).paper.move(-m, -m).zoom()
+
+        ystrings = c.make_strings(self.y.ticks.get_text())
+        left,_ = combine_sizes(ystrings)
+        left += self.y.ticks.text_separation
+
+        xstrings = c.make_strings(self.x.ticks.get_text())
+        _,bottom = combine_sizes(xstrings)
+        bottom += self.x.ticks.text_separation
+
+        right = c.box(1,1).paper.left(0.5*xstrings[-1].size[0]).pos[0]
+        top =   c.box(1,1).paper.down(0.5*ystrings[-1].size[1]).pos[1]
+
+        x_label, y_label = c.make_strings((self.x.label, self.y.label))
+        c.make_svgs()
+
+        if self.y.label:
+            left += y_label.size[1] + self.y.text_separation
+
+        if self.x.label:
+            bottom += x_label.size[1] + self.x.text_separation
+
+        if self.title:
+            title_string = r'\parbox{%f mm}{%s}' % (
+                 right - left, self.title)
+        else:
+            title_string = ''
+
+        title, = c.make_strings((title_string,))
+        c.make_svgs()
+
+        if self.title:
+            top -= (title.size[1] + self.text_separation)
+
+
+        c.paper(right, 0).text(self.x.label, anchor='southeast')
+        c.paper(0, top).text(self.y.label, anchor='northeast', rotation=90)
+        
+        c = c.paper(left, bottom).to(right, top).zoom()
+        c.box(0,1).paper.up(self.text_separation).text(title_string,
+                                                       anchor='southwest')
+
+
+        return super(Scatter2D, self)._pre_draw(c)
+
+    def _draw(self, c):
+        super(Scatter2D, self)._draw(c)
 
 class Histo1D(Plot):
     x = Axis()
@@ -313,4 +414,3 @@ class Histo1D(Plot):
 
     def _draw(self, c):
         super(Histo1D, self)._draw(c)
-
